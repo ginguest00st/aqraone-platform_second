@@ -1,0 +1,11 @@
+{
+  "title": "AqraOne - Marketplace UMKM",
+  "description": "Sistem Informasi Marketplace Multi-Merchant UMKM dengan Integrasi Pembayaran Digital Finnet",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
