@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import Navbar from "../../components/ui/Navbar";
 import ProductCard from "../../components/ui/ProductCard";
@@ -7,6 +7,8 @@ import {
   IconCart, IconPackage, IconUser, IconStar,
   IconMapPin, IconShield, IconStore,
 } from "../../components/ui/Icons";
+import { productService, type ProductWithUmkm } from "../../services/product.service";
+import { umkmService, type UmkmWithCategory } from "../../services/umkm.service";
 
 const allProducts = [
   { id: "1",  name: "Keripik Pisang Original",  umkm: "Naraya Snack",    price: 25000,  rating: 4.8, stock: 120, image: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop&auto=format", badge: "hot" as const },
@@ -21,12 +23,11 @@ const allProducts = [
   { id: "10", name: "Jamu Kunyit Asam Segar",   umkm: "Warisan Herbal",  price: 20000,  rating: 4.5, stock: 60,  image: "https://images.unsplash.com/photo-1563822249548-9a72b6353cd1?w=400&h=300&fit=crop&auto=format", badge: "new" as const },
 ];
 
-const umkmSpotlight = [
-  { name: "Naraya Snack",    category: "Makanan",   rating: 4.8, products: 24, location: "Bandung",     image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=200&h=200&fit=crop&auto=format" },
-  { name: "Batik Nusantara", category: "Fashion",   rating: 4.6, products: 38, location: "Yogyakarta",  image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200&h=200&fit=crop&auto=format" },
-  { name: "Gayo Coffee",     category: "Minuman",   rating: 4.9, products: 15, location: "Aceh Tengah", image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop&auto=format" },
-  { name: "Silver Bali",     category: "Kerajinan", rating: 4.8, products: 31, location: "Denpasar",    image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=200&h=200&fit=crop&auto=format" },
-  { name: "Tenun Flores",    category: "Fashion",   rating: 4.9, products: 12, location: "Flores, NTT", image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=200&h=200&fit=crop&auto=format" },
+const defaultUmkmSpotlight = [
+  { name: "Mulya Snack & Heritage", category: "Kuliner", rating: 4.9, products: 5, location: "Yogyakarta", image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=200&h=200&fit=crop&auto=format" },
+  { name: "Batik Danar Solo", category: "Fashion", rating: 4.8, products: 4, location: "Surakarta", image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200&h=200&fit=crop&auto=format" },
+  { name: "Gayo Mountain Coffee", category: "Kopi", rating: 4.9, products: 3, location: "Aceh Tengah", image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop&auto=format" },
+  { name: "Lombok Craft & Rattan", category: "Kerajinan", rating: 4.8, products: 3, location: "Lombok", image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=200&h=200&fit=crop&auto=format" },
 ];
 
 const TABS = ["Terlaris", "Terbaru", "Promo"] as const;
@@ -47,7 +48,65 @@ export default function HomePage() {
   const [cart, setCart] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("Terlaris");
+  const [dbProducts, setDbProducts] = useState<ProductWithUmkm[]>([]);
+  const [dbUmkm, setDbUmkm] = useState<UmkmWithCategory[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [prodRes, umkmRes] = await Promise.all([
+          productService.getAllProducts(),
+          umkmService.getAllUmkm("APPROVED"),
+        ]);
+        if (prodRes.data && prodRes.data.length > 0) {
+          setDbProducts(prodRes.data);
+        }
+        if (umkmRes.data && umkmRes.data.length > 0) {
+          setDbUmkm(umkmRes.data);
+        }
+      } catch (e) {
+        console.error("Home data load error:", e);
+      }
+    }
+    loadData();
+  }, []);
+
+  const displayedProducts = dbProducts.length > 0
+    ? dbProducts.map((p) => {
+        const minPrice = p.product_variants && p.product_variants.length > 0
+          ? Math.min(...p.product_variants.map((v) => Number(v.harga) || 0))
+          : 25000;
+        const totalStock = p.product_variants
+          ? p.product_variants.reduce((sum, v) => sum + (v.stock_levels?.sisa_stok ?? 0), 0)
+          : 50;
+        return {
+          id: p.id,
+          name: p.nama_produk,
+          umkm: p.umkm?.nama_toko || "UMKM Mitra",
+          price: minPrice,
+          rating: 4.8,
+          stock: totalStock,
+          image: p.gambar_url || "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop",
+          badge: (p.status === "AKTIF" ? "hot" : undefined) as "hot" | undefined,
+        };
+      })
+    : allProducts;
+
+  const displayedUmkm = dbUmkm.length > 0
+    ? dbUmkm.map((u) => {
+        const loc = u.alamat ? u.alamat.split(",")[1]?.trim() || u.alamat.split(",")[0] : "Indonesia";
+        return {
+          id: u.id,
+          name: u.nama_toko,
+          category: u.kategori_umkm?.nama_kategori || "UMKM Mitra",
+          rating: 4.9,
+          products: dbProducts.filter((p) => p.umkm_id === u.id).length || 4,
+          location: loc,
+          image: u.logo_url || "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=200&h=200&fit=crop",
+        };
+      })
+    : defaultUmkmSpotlight;
 
   const addToCart = (id: string) => setCart(prev => [...prev, id]);
 
@@ -222,7 +281,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {allProducts.map(p => (
+          {displayedProducts.map(p => (
             <ProductCard key={p.id} product={p} onAddToCart={addToCart} />
           ))}
         </div>
@@ -281,9 +340,9 @@ export default function HomePage() {
               Semua UMKM <IconArrowRight className="w-4 h-4" />
             </Link>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {umkmSpotlight.map(u => (
-              <Link key={u.name} to="/store/1"
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {displayedUmkm.map(u => (
+              <Link key={u.name} to={`/products?q=${encodeURIComponent(u.name)}`}
                 className="group flex flex-col items-center text-center p-5 bg-[#FAFAF8] border border-[#EBEBEA] rounded-[20px] hover:border-[#C9A227] hover:shadow-[0_4px_20px_rgba(201,162,39,0.10)] transition-all"
               >
                 <div className="relative mb-4">

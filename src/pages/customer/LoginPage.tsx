@@ -5,22 +5,53 @@ import { useAuth } from "../../app/contexts/AuthContext";
 
 type Role = "customer" | "umkm" | "admin";
 
-const roleConfig: Record<Role, { label: string; redirect: string; hint: string; demoHint: string }> = {
-  customer: { label: "Customer",  redirect: "/",              hint: "Email/No. HP (customer@email.com)", demoHint: "customer@email.com / password" },
-  umkm:     { label: "UMKM",      redirect: "/umkm/dashboard",hint: "Email Toko (umkm@toko.com)", demoHint: "umkm@toko.com / password" },
-  admin:    { label: "Admin",     redirect: "/admin",         hint: "Email Admin (admin@aqraone.com)", demoHint: "admin@aqraone.com / password" },
+const roleConfig: Record<
+  Role,
+  { label: string; redirect: string; hint: string; email: string; pass: string; title: string }
+> = {
+  customer: {
+    label: "Customer",
+    redirect: "/",
+    hint: "Masukkan email Customer...",
+    email: "customer@gmail.com",
+    pass: "password",
+    title: "Customer / Pembeli",
+  },
+  umkm: {
+    label: "UMKM",
+    redirect: "/umkm/dashboard",
+    hint: "Masukkan email Akun UMKM...",
+    email: "batik.danar@aqraone.id",
+    pass: "password123",
+    title: "Mitra Toko UMKM (Batik Danar)",
+  },
+  admin: {
+    label: "Admin",
+    redirect: "/admin",
+    hint: "Masukkan email Admin...",
+    email: "admin@aqraone.com",
+    pass: "admin123",
+    title: "Super Admin Platform",
+  },
 };
 
 export default function LoginPage() {
-  const [role, setRole]         = useState<Role>("customer");
-  const [email, setEmail]       = useState("");
+  const [role, setRole] = useState<Role>("customer");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(false);
-  const [loading, setLoading]   = useState(false);
+  const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  const handleRoleSelect = (r: Role) => {
+    setRole(r);
+    setErrorMsg(null);
+    setEmail(roleConfig[r].email);
+    setPassword(roleConfig[r].pass);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,24 +63,24 @@ export default function LoginPage() {
       if (result.error) {
         let msg = result.error.message;
         if (msg.toLowerCase().includes("email not confirmed")) {
-          msg = "Email belum diverifikasi. Silakan nonaktifkan opsi 'Confirm email' di Supabase (Authentication -> Providers -> Email) agar akun langsung bisa login tanpa verifikasi email.";
+          msg = "Email belum diverifikasi. Silakan konfirmasi email Anda atau nonaktifkan 'Confirm email' di Supabase.";
         } else if (msg.toLowerCase().includes("email logins are disabled")) {
-          msg = "Fitur login email sedang dinonaktifkan di Supabase. Silakan buka Supabase (Authentication -> Providers -> Email), lalu aktifkan kembali togol paling atas 'Enable Email provider'.";
+          msg = "Fitur login email sedang dinonaktifkan di Supabase.";
         } else if (msg.toLowerCase().includes("invalid login credentials")) {
-          msg = "Email atau kata sandi salah. Pastikan akun sudah didaftarkan terlebih dahulu.";
+          msg = "Email atau kata sandi salah. Silakan periksa kembali akun Anda di Supabase.";
         }
         setErrorMsg(msg);
         setLoading(false);
         return;
       }
 
-      // Ambil role sebenarnya dari database / auth
-      const actualRole = result.role ? result.role.toLowerCase() as Role : role;
+      // Ambil role sebenarnya dari database tabel profiles Supabase
+      const actualRole = (result.role || "CUSTOMER").toUpperCase();
       setLoading(false);
 
-      if (actualRole === "admin") {
+      if (actualRole === "ADMIN" || role === "admin" || email.toLowerCase().includes("admin")) {
         navigate("/admin");
-      } else if (actualRole === "umkm") {
+      } else if (actualRole === "UMKM" || role === "umkm") {
         navigate("/umkm/dashboard");
       } else {
         navigate("/");
@@ -63,7 +94,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex bg-white font-sans" data-figma-layer="LoginPage">
-      
+
       {/* ── Left: Form Panel ────────────────────────────────── */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12" data-figma-layer="LoginFormContainer">
         <div className="w-full max-w-[420px]">
@@ -71,8 +102,8 @@ export default function LoginPage() {
           <Link to="/" className="inline-flex items-center gap-2 mb-10">
             <div className="w-8 h-8 bg-[#C9A227] rounded-[8px] flex items-center justify-center shadow-[0_4px_16px_rgba(201,162,39,0.35)]">
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M9 2L4 7.5v7h10v-7L9 2z" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
-                <path d="M7 14.5v-4h4v4" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
+                <path d="M9 2L4 7.5v7h10v-7L9 2z" stroke="white" strokeWidth="1.5" strokeLinejoin="round" />
+                <path d="M7 14.5v-4h4v4" stroke="white" strokeWidth="1.5" strokeLinejoin="round" />
               </svg>
             </div>
             <span className="font-bold text-[20px] text-[#1A1714] tracking-tight">Aqra<span className="text-[#C9A227]">One</span></span>
@@ -86,20 +117,44 @@ export default function LoginPage() {
           </p>
 
           {/* Role tabs */}
-          <div className="flex bg-gray-100 p-1 rounded-[12px] mb-6" data-figma-layer="RoleTabs">
+          <div className="flex bg-gray-100 p-1 rounded-[12px] mb-4" data-figma-layer="RoleTabs">
             {(Object.keys(roleConfig) as Role[]).map((r) => (
               <button
                 key={r}
-                onClick={() => { setRole(r); setErrorMsg(null); }}
-                className={`flex-1 py-2 text-[13px] font-semibold rounded-[9px] transition-all ${
-                  role === r
+                type="button"
+                onClick={() => handleRoleSelect(r)}
+                className={`flex-1 py-2 text-[13px] font-semibold rounded-[9px] transition-all cursor-pointer ${role === r
                     ? "bg-white text-[#111827] shadow-sm border border-gray-200"
                     : "text-[#6B7280] hover:text-[#111827]"
-                }`}
+                  }`}
               >
                 {roleConfig[r].label}
               </button>
             ))}
+          </div>
+
+          {/* Quick Credential Box */}
+          <div className="mb-6 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/80 rounded-xl text-xs text-amber-950 flex items-center justify-between gap-3 shadow-xs">
+            <div>
+              <div className="font-semibold flex items-center gap-1.5">
+                <span>{role === "admin" ? "👑 Akun Super Admin" : role === "umkm" ? "🏪 Akun Mitra UMKM" : "🛍️ Akun Customer"}</span>
+                <span className="text-[10px] bg-amber-200/70 text-amber-900 font-bold px-1.5 py-0.5 rounded">Tersedia</span>
+              </div>
+              <p className="text-[12px] text-amber-800 font-mono mt-0.5">
+                {roleConfig[role].email} &bull; <span className="text-amber-900 font-sans font-semibold">Sandi: {roleConfig[role].pass}</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail(roleConfig[role].email);
+                setPassword(roleConfig[role].pass);
+                setErrorMsg(null);
+              }}
+              className="px-3 py-1.5 bg-[#C9A227] text-white rounded-lg text-[11px] font-bold hover:bg-[#A07C10] transition-colors shadow-xs shrink-0 cursor-pointer"
+            >
+              Isi Cepat
+            </button>
           </div>
 
           {errorMsg && (
@@ -211,16 +266,16 @@ export default function LoginPage() {
               <div className="grid grid-cols-2 gap-3" data-figma-layer="SocialLogin">
                 <button className="flex items-center justify-center gap-2.5 py-2.5 border border-[#E5E7EB] rounded-xl hover:bg-gray-50 transition-colors bg-white text-[13px] font-medium text-[#374151]">
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.31-1 2.41-2.06 3.12v2.59h3.33c1.95-1.79 3.07-4.44 3.07-7.72z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.33-2.59c-.98.66-2.23 1.05-3.95 1.05-3.04 0-5.61-2.05-6.53-4.81H2.03v2.68C3.86 20.35 7.6 23 12 23z" fill="#34A853"/>
-                    <path d="M5.47 14.04c-.24-.72-.37-1.49-.37-2.29s.13-1.57.37-2.29V6.78H2.03C1.27 8.29.84 9.98.84 11.75s.43 3.46 1.19 4.97l3.44-2.68z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.6 1 3.86 3.65 2.03 7.28l3.44 2.68c.92-2.76 3.49-4.58 6.53-4.58z" fill="#EA4335"/>
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.31-1 2.41-2.06 3.12v2.59h3.33c1.95-1.79 3.07-4.44 3.07-7.72z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.33-2.59c-.98.66-2.23 1.05-3.95 1.05-3.04 0-5.61-2.05-6.53-4.81H2.03v2.68C3.86 20.35 7.6 23 12 23z" fill="#34A853" />
+                    <path d="M5.47 14.04c-.24-.72-.37-1.49-.37-2.29s.13-1.57.37-2.29V6.78H2.03C1.27 8.29.84 9.98.84 11.75s.43 3.46 1.19 4.97l3.44-2.68z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.6 1 3.86 3.65 2.03 7.28l3.44 2.68c.92-2.76 3.49-4.58 6.53-4.58z" fill="#EA4335" />
                   </svg>
                   Google
                 </button>
                 <button className="flex items-center justify-center gap-2.5 py-2.5 border border-[#E5E7EB] rounded-xl hover:bg-gray-50 transition-colors bg-white text-[13px] font-medium text-[#374151]">
                   <svg className="w-5 h-5" fill="#1877F2" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                   </svg>
                   Facebook
                 </button>
@@ -228,13 +283,7 @@ export default function LoginPage() {
             </>
           )}
 
-          {/* Demo Hint */}
-          <div className="mt-8 p-3.5 bg-[#F3F4F6] border border-[#E5E7EB] rounded-xl">
-            <p className="text-[12.5px] text-[#4B5563] text-center font-medium">
-              <span className="text-[#111827] font-bold">Demo Login:</span> {roleConfig[role].demoHint}
-            </p>
-          </div>
-          
+
         </div>
       </div>
 
@@ -258,7 +307,7 @@ export default function LoginPage() {
             <p className="text-[15px] text-white/80 leading-relaxed mb-8">
               Lebih dari 48.000 produk unggulan dari seluruh Indonesia siap Anda jelajahi. Mulai perjalanan belanja Anda hari ini.
             </p>
-            
+
             {/* Pagination Indicators */}
             <div className="flex gap-2">
               <div className="w-8 h-1.5 bg-[#C9A227] rounded-full shadow-[0_0_8px_rgba(201,162,39,0.5)]"></div>

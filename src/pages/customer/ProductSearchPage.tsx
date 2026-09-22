@@ -1,31 +1,82 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import Navbar from "../../components/ui/Navbar";
 import ProductCard from "../../components/ui/ProductCard";
 import { Checkbox } from "../../components/ui/Input";
+import { productService, type ProductWithUmkm } from "../../services/product.service";
+import { categoryService } from "../../services/category.service";
 
-const products = [
-  { id: "1", name: "Keripik Pisang Original", umkm: "Naraya Snack", price: 25000, rating: 4.8, stock: 120, image: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop&auto=format", badge: "hot" as const },
-  { id: "2", name: "Batik Tulis Motif Parang", umkm: "Batik Nusantara", price: 185000, rating: 4.6, stock: 45, image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop&auto=format", badge: "new" as const },
-  { id: "3", name: "Kopi Arabika Gayo Aceh", umkm: "Gayo Coffee", price: 75000, rating: 4.9, stock: 80, image: "https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=400&h=300&fit=crop&auto=format", badge: "hot" as const },
-  { id: "4", name: "Tas Anyam Rotan Premium", umkm: "Rattan Craft", price: 145000, rating: 4.7, stock: 30, image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop&auto=format" },
-  { id: "5", name: "Tempe Organik Homemade", umkm: "Dapur Sehat", price: 15000, rating: 4.5, stock: 200, image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop&auto=format", badge: "new" as const },
-  { id: "6", name: "Gelang Perak Ukir Bali", umkm: "Silver Bali", price: 95000, rating: 4.8, stock: 50, image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400&h=300&fit=crop&auto=format" },
-  { id: "7", name: "Minyak Kelapa Murni 500ml", umkm: "Kopra Nusantara", price: 45000, rating: 4.6, stock: 150, image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&h=300&fit=crop&auto=format" },
-  { id: "8", name: "Tenun Ikat NTT Original", umkm: "Tenun Flores", price: 320000, rating: 4.9, stock: 20, image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop&auto=format", badge: "hot" as const },
-];
-
-const categories = ["Makanan", "Minuman", "Fashion", "Kerajinan", "Kecantikan", "Elektronik", "Jasa", "Produk Lokal"];
+const defaultCategories = ["Makanan Ringan", "Minuman Khas & Kopi", "Pakaian & Tekstil", "Tas & Kerajinan Anyam", "Aksesoris & Perhiasan", "Bumbu Dapur & Sambal", "Dekorasi & Rumah Tangga"];
 
 export default function ProductSearchPage() {
   const [params] = useSearchParams();
+  const queryParam = params.get("q") || "";
+  const catParam = params.get("cat") || "";
   const [sort, setSort] = useState("Terbaru");
-  const [selectedCats, setSelectedCats] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>(defaultCategories);
+  const [selectedCats, setSelectedCats] = useState<string[]>(catParam ? [catParam] : []);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [terlaris, setTerlaris] = useState(false);
+  const [rawProducts, setRawProducts] = useState<ProductWithUmkm[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const [prodRes, catRes] = await Promise.all([
+          productService.getAllProducts(undefined, queryParam),
+          categoryService.getKategoriProduk(),
+        ]);
+        if (prodRes.data) setRawProducts(prodRes.data);
+        if (catRes.data && catRes.data.length > 0) {
+          setCategories(catRes.data.map(c => c.nama_kategori));
+        }
+      } catch (err) {
+        console.error("Search page load error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [queryParam]);
 
   const toggleCat = (cat: string) => setSelectedCats(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
+
+  // Transform and filter products
+  const formattedProducts = rawProducts.map(p => {
+    const minP = p.product_variants && p.product_variants.length > 0
+      ? Math.min(...p.product_variants.map(v => Number(v.harga) || 0))
+      : 25000;
+    const totalStock = p.product_variants
+      ? p.product_variants.reduce((sum, v) => sum + (v.stock_levels?.sisa_stok ?? 0), 0)
+      : 50;
+    return {
+      id: p.id,
+      name: p.nama_produk,
+      umkm: p.umkm?.nama_toko || "UMKM Mitra",
+      categoryName: p.kategori_produk?.nama_kategori || "",
+      price: minP,
+      rating: 4.8,
+      stock: totalStock,
+      image: p.gambar_url || "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop",
+      badge: (p.status === "AKTIF" ? "hot" : undefined) as "hot" | undefined,
+    };
+  });
+
+  const filteredProducts = formattedProducts.filter(p => {
+    if (selectedCats.length > 0 && !selectedCats.some(c => p.categoryName.toLowerCase().includes(c.toLowerCase()))) {
+      return false;
+    }
+    if (minPrice && p.price < Number(minPrice)) return false;
+    if (maxPrice && p.price > Number(maxPrice)) return false;
+    return true;
+  }).sort((a, b) => {
+    if (sort === "Harga terendah") return a.price - b.price;
+    if (sort === "Harga tertinggi") return b.price - a.price;
+    return 0;
+  });
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
@@ -81,22 +132,32 @@ export default function ProductSearchPage() {
           {/* Results */}
           <div className="flex-1">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-[#6B6B6B]">{products.length} produk ditemukan</p>
+              <p className="text-sm text-[#6B6B6B]">
+                {loading ? "Memuat produk..." : `${filteredProducts.length} produk ditemukan`}
+              </p>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-[#6B6B6B]">Urutkan:</span>
                 <select value={sort} onChange={e => setSort(e.target.value)} className="border border-[#E5E5E5] rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#D4AF37]">
                   <option>Terbaru</option>
                   <option>Harga terendah</option>
                   <option>Harga tertinggi</option>
-                  <option>Rating tertinggi</option>
-                  <option>Terlaris</option>
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {products.map(p => <ProductCard key={p.id} product={p} />)}
-            </div>
+            {loading ? (
+              <div className="py-20 text-center text-[#8A8780] bg-white rounded-2xl border border-[#E5E5E5]">
+                Memuat produk dari database...
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="py-20 text-center text-[#8A8780] bg-white rounded-2xl border border-[#E5E5E5]">
+                Tidak ada produk yang cocok dengan pencarian atau filter Anda.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredProducts.map(p => <ProductCard key={p.id} product={p} />)}
+              </div>
+            )}
 
             {/* Pagination */}
             <div className="flex justify-center gap-1 mt-8">

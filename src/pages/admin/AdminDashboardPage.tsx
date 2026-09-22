@@ -11,10 +11,12 @@ import {
 import { useAuth } from "../../app/contexts/AuthContext";
 import { umkmService, type UmkmWithCategory } from "../../services/umkm.service";
 import { productService, type ProductWithUmkm } from "../../services/product.service";
+import { userService } from "../../services/user.service";
+import { supabase } from "../../lib/supabase";
 
 const sidebarItems = [
   { to: "/admin",             label: "Dashboard",       icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/admin/admins",      label: "Admin",           icon: <IconAdmin className="w-4 h-4" /> },
+  { to: "/admin/admins",      label: "Manajemen User",  icon: <IconAdmin className="w-4 h-4" /> },
   { to: "/admin/umkm",        label: "UMKM",            icon: <IconStore className="w-4 h-4" /> },
   { to: "/admin/umkm/verify", label: "Verifikasi UMKM", icon: <IconShield className="w-4 h-4" /> },
   { to: "/admin/categories",  label: "Kategori",        icon: <IconFolder className="w-4 h-4" /> },
@@ -71,20 +73,28 @@ export default function AdminDashboardPage() {
   const [allUmkm, setAllUmkm] = useState<UmkmWithCategory[]>([]);
   const [allProducts, setAllProducts] = useState<ProductWithUmkm[]>([]);
   const [pendingList, setPendingList] = useState<UmkmWithCategory[]>([]);
+  const [totalCustomer, setTotalCustomer] = useState(0);
+  const [totalTransactions, setTotalTransactions] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadAdminData() {
       try {
-        const [umkmRes, prodRes, pendingRes] = await Promise.all([
+        const [umkmRes, prodRes, pendingRes, statsRes, ordRes] = await Promise.all([
           umkmService.getAllUmkm(),
           productService.getAllProducts(),
           umkmService.getPendingUmkm(),
+          userService.getUserStats(),
+          supabase.from("orders").select("*", { count: "exact", head: true }),
         ]);
 
         if (umkmRes.data) setAllUmkm(umkmRes.data);
         if (prodRes.data) setAllProducts(prodRes.data);
         if (pendingRes.data) setPendingList(pendingRes.data);
+        if (statsRes.data) setTotalCustomer(statsRes.data.customer);
+        if (ordRes.count !== null && ordRes.count !== undefined) {
+          setTotalTransactions(ordRes.count);
+        }
       } catch (err) {
         console.error("Admin dashboard load error:", err);
       } finally {
@@ -191,12 +201,12 @@ export default function AdminDashboardPage() {
 
           {/* Stat Cards */}
           <div data-figma-layer="StatGrid" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-            <StatCard label="Total UMKM"      value={loading ? "..." : String(totalUmkm)}   icon="🏪" accent />
+            <StatCard label="Total UMKM"      value={loading ? "..." : String(totalUmkm)}      icon="🏪" accent />
+            <StatCard label="Total Customer"  value={loading ? "..." : String(totalCustomer)}  icon="👥" iconBg="bg-blue-50" />
             <StatCard label="UMKM Aktif"      value={loading ? "..." : String(approvedUmkm)}   icon="✅" iconBg="bg-emerald-50" />
-            <StatCard label="Menunggu Verif"  value={loading ? "..." : String(pendingCount)}      icon="⏳" iconBg="bg-amber-50" />
+            <StatCard label="Menunggu Verif"  value={loading ? "..." : String(pendingCount)}    icon="⏳" iconBg="bg-amber-50" />
             <StatCard label="Total Produk"    value={loading ? "..." : String(totalProducts)}  icon="📦" />
-            <StatCard label="Total Transaksi" value="0"   icon="💳" />
-            <StatCard label="Pendapatan"      value="Rp0"  icon="💰" iconBg="bg-[#FDF6E3]" />
+            <StatCard label="Total Transaksi" value={loading ? "..." : String(totalTransactions)} icon="💳" />
           </div>
 
           {/* Pending Verifications Widget */}

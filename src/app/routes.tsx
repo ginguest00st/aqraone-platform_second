@@ -73,6 +73,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/admin", Component: AdminDashboardPage },
       { path: "/admin/admins", Component: AdminManagePage },
+      { path: "/admin/users", Component: AdminManagePage },
       { path: "/admin/umkm", Component: AdminUMKMPage },
       { path: "/admin/umkm/verify", Component: AdminVerifyUMKMPage },
       { path: "/admin/categories", Component: AdminCategoryPage },

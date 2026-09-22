@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS public.kategori_umkm (
     deskripsi TEXT,
     icon TEXT,
     status general_status NOT NULL DEFAULT 'AKTIF',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),x
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -398,9 +398,16 @@ CREATE POLICY "Enable insert for authenticated users and service role"
     WITH CHECK (TRUE);
 
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-CREATE POLICY "Users can update own profile"
+DROP POLICY IF EXISTS "Users can update own profile or admin" ON public.profiles;
+CREATE POLICY "Users can update own profile or admin"
     ON public.profiles FOR UPDATE
-    USING (auth.uid() = id);
+    USING (auth.uid() = id OR public.is_admin());
+
+DROP POLICY IF EXISTS "Admin can delete user profile" ON public.profiles;
+CREATE POLICY "Admin can delete user profile"
+    ON public.profiles FOR DELETE
+    USING (public.is_admin());
+
 
 -- 12.2 Kategori UMKM & Produk
 DROP POLICY IF EXISTS "Anyone can view active categories" ON public.kategori_umkm;

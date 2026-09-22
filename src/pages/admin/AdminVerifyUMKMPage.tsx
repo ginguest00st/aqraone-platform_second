@@ -13,7 +13,7 @@ import { useAuth } from "../../app/contexts/AuthContext";
 
 const sidebarItems = [
   { to: "/admin", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/admin/admins", label: "Admin", icon: <IconAdmin className="w-4 h-4" /> },
+  { to: "/admin/admins", label: "Manajemen User", icon: <IconAdmin className="w-4 h-4" /> },
   { to: "/admin/umkm", label: "UMKM", icon: <IconStore className="w-4 h-4" /> },
   { to: "/admin/umkm/verify", label: "Verifikasi UMKM", icon: <IconShield className="w-4 h-4" /> },
   { to: "/admin/categories", label: "Kategori", icon: <IconFolder className="w-4 h-4" /> },

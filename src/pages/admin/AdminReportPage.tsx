@@ -1,14 +1,17 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import Sidebar from "../../components/ui/Sidebar";
 import StatCard from "../../components/ui/StatCard";
 import Button from "../../components/ui/Button";
+import Table from "../../components/ui/Table";
 import PanelHeader from "../../components/ui/PanelHeader";
 import { IconDashboard, IconAdmin, IconStore, IconShield, IconFolder, IconPackage, IconCreditCard, IconBarChart, IconSettings, IconLogout, IconPlus } from "../../components/ui/Icons";
+import { supabase } from "../../lib/supabase";
 
 const sidebarItems = [
   { to: "/admin", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/admin/admins", label: "Admin", icon: <IconAdmin className="w-4 h-4" /> },
+  { to: "/admin/admins", label: "Manajemen User", icon: <IconAdmin className="w-4 h-4" /> },
   { to: "/admin/umkm", label: "UMKM", icon: <IconStore className="w-4 h-4" /> },
   { to: "/admin/umkm/verify", label: "Verifikasi UMKM", icon: <IconShield className="w-4 h-4" /> },
   { to: "/admin/categories", label: "Kategori", icon: <IconFolder className="w-4 h-4" /> },
@@ -33,6 +36,53 @@ function formatRp(n: number) {
 }
 
 export default function AdminReportPage() {
+  const [reports, setReports] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("reports")
+      .select("*, umkm(nama_toko)")
+      .order("created_at", { ascending: false })
+      .then((res) => {
+        if (res.data) setReports(res.data);
+      });
+  }, []);
+
+  const defaultReports = [
+    { id: "1", jenis_laporan: "PENJUALAN_UMKM", nama_file: "Laporan_Penjualan_MulyaStore_Sep2026.pdf", periode: "01 Sep - 22 Sep 2026", toko: "Mulya Snack & Heritage", format: "PDF" },
+    { id: "2", jenis_laporan: "TRANSAKSI_PLATFORM", nama_file: "Rekap_Transaksi_Platform_Q3_2026.xlsx", periode: "01 Sep - 22 Sep 2026", toko: "Semua UMKM", format: "Excel" },
+    { id: "3", jenis_laporan: "REKAP_UMKM", nama_file: "Laporan_Pertumbuhan_Mitra_UMKM_2026.pdf", periode: "01 Agu - 22 Sep 2026", toko: "Semua UMKM", format: "PDF" },
+    { id: "4", jenis_laporan: "PENJUALAN_UMKM", nama_file: "Laporan_Penjualan_BatikDanar_Sep2026.pdf", periode: "01 Sep - 22 Sep 2026", toko: "Batik Danar Solo", format: "PDF" },
+    { id: "5", jenis_laporan: "PENJUALAN_UMKM", nama_file: "Laporan_Penjualan_GayoCoffee_Sep2026.pdf", periode: "01 Sep - 22 Sep 2026", toko: "Gayo Mountain Coffee", format: "PDF" },
+  ];
+
+  const reportList = reports.length > 0
+    ? reports.map(r => ({
+        id: r.id,
+        jenis_laporan: r.jenis_laporan,
+        nama_file: r.nama_file,
+        periode: `${new Date(r.periode_awal).toLocaleDateString("id-ID", { day: "numeric", month: "short" })} - ${new Date(r.periode_akhir).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`,
+        toko: r.umkm?.nama_toko || "Seluruh Platform",
+        format: r.nama_file.endsWith(".xlsx") ? "Excel" : "PDF",
+      }))
+    : defaultReports;
+
+  const reportColumns = [
+    { key: "nama_file", header: "Nama Dokumen Laporan", render: (r: any) => <span className="font-medium text-[#1A1714] text-xs">{r.nama_file}</span> },
+    { key: "jenis_laporan", header: "Tipe Laporan", render: (r: any) => <span className="font-mono text-[11px] text-[#C9A227] bg-[#FDF6E3] px-2 py-0.5 rounded">{r.jenis_laporan}</span> },
+    { key: "toko", header: "Entitas / Toko", render: (r: any) => <span className="text-xs text-[#7C7770]">{r.toko}</span> },
+    { key: "periode", header: "Periode", render: (r: any) => <span className="text-xs text-[#7C7770]">{r.periode}</span> },
+    { key: "format", header: "Format", render: (r: any) => <span className="text-xs font-semibold text-[#1A1714]">{r.format}</span> },
+    {
+      key: "action",
+      header: "Aksi",
+      render: () => (
+        <Button size="sm" variant="outline-gold">
+          Unduh
+        </Button>
+      ),
+    },
+  ];
   return (
     <div className="flex h-screen bg-[#FAFAF8] overflow-hidden">
       <Sidebar items={sidebarItems} logo={
@@ -142,6 +192,17 @@ export default function AdminReportPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Tabel Dokumen Laporan */}
+          <div className="bg-white rounded-[18px] border border-[#E8E6E1] p-5" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-semibold text-[#1A1714]">📁 Arsip & Unduhan Dokumen Laporan</h2>
+                <p className="text-xs text-[#7C7770]">Semua berkas laporan resmi platform dan toko UMKM mitra yang telah digenerate</p>
+              </div>
+            </div>
+            <Table columns={reportColumns} data={reportList} />
           </div>
         </main>
       </div>

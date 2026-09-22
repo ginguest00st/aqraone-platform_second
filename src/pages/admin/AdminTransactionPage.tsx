@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import Sidebar from "../../components/ui/Sidebar";
 import Table from "../../components/ui/Table";
@@ -7,10 +7,11 @@ import Button from "../../components/ui/Button";
 import PanelHeader from "../../components/ui/PanelHeader";
 import { Input, Select } from "../../components/ui/Input";
 import { IconDashboard, IconAdmin, IconStore, IconShield, IconFolder, IconPackage, IconCreditCard, IconBarChart, IconSettings, IconLogout, IconPlus } from "../../components/ui/Icons";
+import { supabase } from "../../lib/supabase";
 
 const sidebarItems = [
   { to: "/admin", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/admin/admins", label: "Admin", icon: <IconAdmin className="w-4 h-4" /> },
+  { to: "/admin/admins", label: "Manajemen User", icon: <IconAdmin className="w-4 h-4" /> },
   { to: "/admin/umkm", label: "UMKM", icon: <IconStore className="w-4 h-4" /> },
   { to: "/admin/umkm/verify", label: "Verifikasi UMKM", icon: <IconShield className="w-4 h-4" /> },
   { to: "/admin/categories", label: "Kategori", icon: <IconFolder className="w-4 h-4" /> },
@@ -28,12 +29,12 @@ interface Transaction {
   payment: string; payStatus: PayStatus; orderStatus: OrdStatus; date: string;
 }
 
-const transactions: Transaction[] = [
-  { id: "TRX-20260915-001", customer: "Siti Rahayu", umkm: "Naraya Snack", total: 125000, payment: "Finnet", payStatus: "PAID", orderStatus: "DIPROSES", date: "15 Sep 2026" },
-  { id: "TRX-20260914-002", customer: "Budi Santoso", umkm: "Batik Nusantara", total: 185000, payment: "Virtual Account", payStatus: "PAID", orderStatus: "DIKIRIM", date: "14 Sep 2026" },
-  { id: "TRX-20260913-003", customer: "Dewi Lestari", umkm: "Gayo Coffee", total: 75000, payment: "E-Wallet", payStatus: "PENDING", orderStatus: "BARU", date: "13 Sep 2026" },
-  { id: "TRX-20260912-004", customer: "Ahmad Fauzi", umkm: "Rattan Craft", total: 145000, payment: "Finnet", payStatus: "FAILED", orderStatus: "DIBATALKAN", date: "12 Sep 2026" },
-  { id: "TRX-20260911-005", customer: "Rina Susanti", umkm: "Silver Bali", total: 95000, payment: "Bank Transfer", payStatus: "PAID", orderStatus: "SELESAI", date: "11 Sep 2026" },
+const defaultTransactions: Transaction[] = [
+  { id: "ORD-20260920-MULYA-001", customer: "Andi Pratama", umkm: "Mulya Snack & Heritage", total: 116000, payment: "QRIS", payStatus: "PAID", orderStatus: "SELESAI", date: "20 Sep 2026" },
+  { id: "ORD-20260921-MULYA-002", customer: "Siti Rahayu", umkm: "Mulya Snack & Heritage", total: 80000, payment: "VA BCA", payStatus: "PAID", orderStatus: "DIKIRIM", date: "21 Sep 2026" },
+  { id: "ORD-20260921-BATIK-003", customer: "Andi Pratama", umkm: "Batik Danar Solo", total: 203000, payment: "VA BRI", payStatus: "PAID", orderStatus: "DIPROSES", date: "21 Sep 2026" },
+  { id: "ORD-20260922-GAYO-004", customer: "Siti Rahayu", umkm: "Gayo Mountain Coffee", total: 174000, payment: "QRIS", payStatus: "PAID", orderStatus: "SELESAI", date: "22 Sep 2026" },
+  { id: "ORD-20260922-RATTAN-005", customer: "Andi Pratama", umkm: "Lombok Craft & Rattan", total: 167000, payment: "VA Mandiri", payStatus: "PENDING", orderStatus: "BARU", date: "22 Sep 2026" },
 ];
 
 function formatRp(n: number) { return "Rp" + n.toLocaleString("id-ID"); }
@@ -41,6 +42,58 @@ function formatRp(n: number) { return "Rp" + n.toLocaleString("id-ID"); }
 export default function AdminTransactionPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [dbTransactions, setDbTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadTransactions() {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("orders")
+          .select(`
+            id,
+            order_number,
+            total_harga,
+            status_order,
+            created_at,
+            umkm (nama_toko),
+            profiles:customer_id (nama),
+            payments (payment_method, payment_status)
+          `)
+          .order("created_at", { ascending: false });
+
+        if (data && data.length > 0) {
+          const mapped: Transaction[] = data.map((o: any) => ({
+            id: o.order_number || `ORD-${o.id.slice(0, 8).toUpperCase()}`,
+            customer: o.profiles?.nama || "Pelanggan",
+            umkm: o.umkm?.nama_toko || "Mulya Snack & Heritage",
+            total: Number(o.total_harga) || 0,
+            payment: (o.payments?.payment_method || "Finnet").replace("FINNET_", "").replace("_", " "),
+            payStatus: (o.payments?.payment_status || "PENDING") as PayStatus,
+            orderStatus: (o.status_order === "COMPLETED" ? "SELESAI" : o.status_order === "SHIPPED" ? "DIKIRIM" : o.status_order === "PROCESSING" ? "DIPROSES" : "BARU") as OrdStatus,
+            date: new Date(o.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }),
+          }));
+          setDbTransactions(mapped);
+        }
+      } catch (err) {
+        console.error("Transactions load error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadTransactions();
+  }, []);
+
+  const allTx = dbTransactions.length > 0 ? dbTransactions : defaultTransactions;
+  const filtered = allTx.filter((t) => {
+    if (statusFilter && t.payStatus !== statusFilter) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return t.id.toLowerCase().includes(q) || t.customer.toLowerCase().includes(q) || t.umkm.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   const columns = [
     { key: "id", header: "Transaction ID", render: (r: Transaction) => <span className="font-mono text-xs text-[#D4AF37]">{r.id}</span> },
@@ -87,10 +140,10 @@ export default function AdminTransactionPage() {
           {/* Summary mini-cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "Total Transaksi", value: "2.450", sub: "bulan ini", color: "bg-[#1A1714]", textColor: "text-white", subColor: "text-white/50" },
-              { label: "Berhasil (Paid)", value: "2.310", sub: "+12% dari bulan lalu", color: "bg-emerald-50", textColor: "text-emerald-700", subColor: "text-emerald-500" },
-              { label: "Pending", value: "87", sub: "menunggu pembayaran", color: "bg-amber-50", textColor: "text-amber-700", subColor: "text-amber-500" },
-              { label: "Gagal / Expired", value: "53", sub: "perlu penanganan", color: "bg-red-50", textColor: "text-red-700", subColor: "text-red-400" },
+              { label: "Total Transaksi", value: String(allTx.length), sub: "keseluruhan", color: "bg-[#1A1714]", textColor: "text-white", subColor: "text-white/50" },
+              { label: "Berhasil (Paid)", value: String(allTx.filter(t => t.payStatus === "PAID").length), sub: "sukses diverifikasi", color: "bg-emerald-50", textColor: "text-emerald-700", subColor: "text-emerald-500" },
+              { label: "Pending", value: String(allTx.filter(t => t.payStatus === "PENDING").length), sub: "menunggu pembayaran", color: "bg-amber-50", textColor: "text-amber-700", subColor: "text-amber-500" },
+              { label: "Gagal / Expired", value: String(allTx.filter(t => t.payStatus === "FAILED" || t.payStatus === "EXPIRED").length), sub: "dibatalkan", color: "bg-red-50", textColor: "text-red-700", subColor: "text-red-400" },
             ].map(s => (
               <div key={s.label} className={`${s.color} rounded-[16px] px-5 py-4 border border-black/5`}>
                 <p className={`text-[11px] font-medium ${s.subColor ?? s.textColor} opacity-70`}>{s.label}</p>
@@ -111,10 +164,8 @@ export default function AdminTransactionPage() {
                 { value: "FAILED", label: "Failed" },
                 { value: "EXPIRED", label: "Expired" },
               ]} value={statusFilter} onChange={e => setStatusFilter(e.target.value)} />
-              <input type="date" className="border border-[#E8E6E1] rounded-[10px] px-3 py-2 text-sm outline-none focus:border-[#C9A227] bg-[#FAFAF8]" />
-              <input type="date" className="border border-[#E8E6E1] rounded-[10px] px-3 py-2 text-sm outline-none focus:border-[#C9A227] bg-[#FAFAF8]" />
             </div>
-            <Table columns={columns} data={transactions} />
+            <Table columns={columns} data={filtered} />
           </div>
         </main>
       </div>

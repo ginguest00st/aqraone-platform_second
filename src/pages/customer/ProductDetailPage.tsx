@@ -1,31 +1,63 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useParams } from "react-router";
 import Navbar from "../../components/ui/Navbar";
 import Button from "../../components/ui/Button";
 import { Stars, formatRp } from "../../components/ui/ProductCard";
 import Badge from "../../components/ui/Badge";
+import { supabase } from "../../lib/supabase";
 
-const images = [
+const defaultImages = [
   "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=600&h=500&fit=crop&auto=format",
   "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=500&fit=crop&auto=format",
   "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&h=500&fit=crop&auto=format",
 ];
 
-const sizes = ["S", "M", "L", "XL"];
-const colors = ["Hitam", "Putih", "Gold"];
-
 export default function ProductDetailPage() {
+  const { id } = useParams();
+  const [product, setProduct] = useState<any>(null);
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [activeImg, setActiveImg] = useState(0);
-  const [size, setSize] = useState("M");
-  const [color, setColor] = useState("Hitam");
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!id) return;
+    supabase
+      .from("products")
+      .select(`
+        *,
+        umkm (id, nama_toko, nama_umkm, alamat),
+        kategori_produk (nama_kategori),
+        product_variants (
+          *,
+          stock_levels (*)
+        )
+      `)
+      .eq("id", id)
+      .maybeSingle()
+      .then((res) => {
+        if (res.data) {
+          setProduct(res.data);
+          if (res.data.product_variants && res.data.product_variants.length > 0) {
+            setSelectedVariant(res.data.product_variants[0]);
+          }
+        }
+      });
+  }, [id]);
 
   const handleAddToCart = () => {
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
+
+  const images = product?.gambar_url ? [product.gambar_url, ...defaultImages.slice(1)] : defaultImages;
+  const productName = product?.nama_produk || "Keripik Pisang Original";
+  const storeName = product?.umkm?.nama_toko || "Mulya Snack & Heritage";
+  const categoryName = product?.kategori_produk?.nama_kategori || "Makanan Ringan";
+  const price = selectedVariant?.harga ? Number(selectedVariant.harga) : 25000;
+  const stock = selectedVariant?.stock_levels?.sisa_stok ?? 100;
+  const variants = product?.product_variants || [];
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
@@ -36,9 +68,9 @@ export default function ProductDetailPage() {
         <div className="flex items-center gap-2 text-xs text-[#6B6B6B] mb-6">
           <Link to="/home" className="hover:text-[#D4AF37]">Home</Link>
           <span>/</span>
-          <Link to="/products?cat=Makanan" className="hover:text-[#D4AF37]">Makanan</Link>
+          <Link to={`/products?cat=${encodeURIComponent(categoryName)}`} className="hover:text-[#D4AF37]">{categoryName}</Link>
           <span>/</span>
-          <span className="text-[#202020]">Keripik Pisang Original</span>
+          <span className="text-[#202020] truncate max-w-xs">{productName}</span>
         </div>
 
         <div className="grid md:grid-cols-2 gap-10">
@@ -61,44 +93,48 @@ export default function ProductDetailPage() {
           {/* Product Info */}
           <div className="space-y-5">
             <div>
-              <Link to="/store/1" className="text-sm text-[#D4AF37] font-semibold hover:underline">Naraya Snack</Link>
-              <h1 className="text-2xl font-bold text-[#202020] mt-1">Keripik Pisang Original</h1>
+              <span className="text-sm text-[#D4AF37] font-semibold">{storeName}</span>
+              <h1 className="text-2xl font-bold text-[#202020] mt-1">{productName}</h1>
               <div className="flex items-center gap-3 mt-2">
                 <Stars rating={4.8} />
-                <span className="text-xs text-[#6B6B6B]">· 248 ulasan · 1.2k+ terjual</span>
+                <span className="text-xs text-[#6B6B6B]">· Terverifikasi · Kualitas Terjamin</span>
               </div>
             </div>
 
             <div className="bg-[#FFF5D6] rounded-xl p-4">
-              <p className="text-3xl font-bold text-[#202020]">{formatRp(75000)}</p>
-              <p className="text-xs text-[#6B6B6B] mt-1">Stok: <strong className="text-[#2E8B57]">120 tersedia</strong></p>
+              <p className="text-3xl font-bold text-[#202020]">{formatRp(price)}</p>
+              <p className="text-xs text-[#6B6B6B] mt-1">Stok: <strong className="text-[#2E8B57]">{stock} tersedia</strong></p>
             </div>
 
-            {/* Size Variants */}
-            <div>
-              <p className="text-sm font-semibold text-[#202020] mb-2">Ukuran</p>
-              <div className="flex gap-2">
-                {sizes.map(s => (
-                  <button key={s} onClick={() => setSize(s)}
-                    className={`w-12 h-10 rounded-xl text-sm font-medium border-2 transition-all ${size === s ? "border-[#D4AF37] bg-[#FFF5D6] text-[#D4AF37]" : "border-[#E5E5E5] text-[#6B6B6B] hover:border-[#D4AF37]"}`}>
-                    {s}
-                  </button>
-                ))}
+            {/* Product Variants */}
+            {variants.length > 0 && (
+              <div>
+                <p className="text-sm font-semibold text-[#202020] mb-2">Pilihan Varian / Kemasan</p>
+                <div className="flex gap-2 flex-wrap">
+                  {variants.map((v: any) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setSelectedVariant(v)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                        selectedVariant?.id === v.id
+                          ? "border-[#D4AF37] bg-[#FFF5D6] text-[#D4AF37] font-semibold"
+                          : "border-[#E5E5E5] text-[#6B6B6B] hover:border-[#D4AF37]"
+                      }`}
+                    >
+                      {v.nama_varian} ({formatRp(Number(v.harga) || 0)})
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Color Variants */}
-            <div>
-              <p className="text-sm font-semibold text-[#202020] mb-2">Warna: <span className="text-[#D4AF37]">{color}</span></p>
-              <div className="flex gap-2">
-                {colors.map(c => (
-                  <button key={c} onClick={() => setColor(c)}
-                    className={`px-3 py-1.5 rounded-xl text-sm border-2 transition-all ${color === c ? "border-[#D4AF37] bg-[#FFF5D6] text-[#D4AF37]" : "border-[#E5E5E5] text-[#6B6B6B] hover:border-[#D4AF37]"}`}>
-                    {c}
-                  </button>
-                ))}
+            {/* Description */}
+            {product?.deskripsi && (
+              <div className="pt-2">
+                <p className="text-sm font-semibold text-[#202020] mb-1.5">Deskripsi Produk</p>
+                <p className="text-xs text-[#6B6B6B] leading-relaxed">{product.deskripsi}</p>
               </div>
-            </div>
+            )}
 
             {/* Quantity */}
             <div>
@@ -107,7 +143,7 @@ export default function ProductDetailPage() {
                 <button onClick={() => setQty(Math.max(1, qty - 1))} className="w-9 h-9 rounded-xl border border-[#E5E5E5] text-lg font-bold text-[#202020] hover:border-[#D4AF37] transition-all flex items-center justify-center">−</button>
                 <span className="w-12 text-center font-semibold text-[#202020]">{qty}</span>
                 <button onClick={() => setQty(qty + 1)} className="w-9 h-9 rounded-xl border border-[#E5E5E5] text-lg font-bold text-[#202020] hover:border-[#D4AF37] transition-all flex items-center justify-center">+</button>
-                <span className="text-sm text-[#6B6B6B]">Subtotal: <strong className="text-[#202020]">{formatRp(75000 * qty)}</strong></span>
+                <span className="text-sm text-[#6B6B6B]">Subtotal: <strong className="text-[#202020]">{formatRp(price * qty)}</strong></span>
               </div>
             </div>
 
