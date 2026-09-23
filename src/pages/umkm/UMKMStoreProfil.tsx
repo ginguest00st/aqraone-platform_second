@@ -185,56 +185,57 @@ export default function UMKMStoreProfil() {
 
           {/* Store Header Banner */}
           <div className="bg-white rounded-[18px] border border-[#E8E6E1] overflow-hidden">
-            <div className="h-28 bg-gradient-to-r from-[#202020] to-[#3a3a3a] relative">
+            <div className="h-44 sm:h-48 md:h-52 bg-gradient-to-r from-[#202020] to-[#3a3a3a] relative">
               <img
                 src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1000&h=200&fit=crop&auto=format"
                 alt=""
-                className="w-full h-full object-cover opacity-40"
+                className="w-full h-full object-cover opacity-75"
               />
             </div>
-            <div className="px-6 pb-5">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-10">
-                <div className="flex items-end gap-4">
-                  <div className="w-20 h-20 rounded-[18px] border-4 border-white shadow-lg overflow-hidden bg-white shrink-0">
-                    <img
-                      src={
-                        umkm?.logo_url ||
-                        "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=120&h=120&fit=crop&auto=format"
-                      }
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="pb-1">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <h2 className="text-xl font-bold text-[#1A1714]">{umkm?.nama_toko || "Toko Belum Dinamai"}</h2>
-                      {getStatusBadge()}
+              <div className="px-6 pb-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-20 h-20 rounded-[18px] border-4 border-white shadow-lg overflow-hidden bg-white shrink-0 -mt-10 z-10">
+                      <img
+                        src={
+                          umkm?.logo_url ||
+                          "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=120&h=120&fit=crop&auto=format"
+                        }
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                    <p className="text-xs text-[#6B6B6B] mt-1">
-                      Kode: <span className="font-mono font-medium text-[#1A1714]">{umkm?.kode_umkm}</span> · Kategori:{" "}
-                      <span className="font-medium text-[#C9A227]">{umkm?.kategori_umkm?.nama_kategori || "Belum dipilih"}</span>
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex gap-2">
-                  {edit ? (
-                    <>
-                      <Button variant="secondary" size="sm" onClick={() => setEdit(false)} disabled={saving}>
-                        Batal
+                    <div className="pt-2">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h2 className="text-xl font-bold text-[#1A1714]">{umkm?.nama_toko || "Toko Belum Dinamai"}</h2>
+                        {getStatusBadge()}
+                      </div>
+                      <p className="text-xs text-[#6B6B6B] mt-1">
+                        Kode: <span className="font-mono font-medium text-[#1A1714]">{umkm?.kode_umkm}</span> · Kategori:{" "}
+                        <span className="font-medium text-[#C9A227]">{umkm?.kategori_umkm?.nama_kategori || "Belum dipilih"}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    {edit ? (
+                      <>
+                        <Button variant="secondary" size="sm" onClick={() => setEdit(false)} disabled={saving}>
+                          Batal
+                        </Button>
+                        <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
+                          {saving ? "Menyimpan..." : "Simpan Perubahan"}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button variant="outline-gold" size="sm" onClick={() => setEdit(true)}>
+                        Edit Profil Toko
                       </Button>
-                      <Button variant="primary" size="sm" onClick={handleSave} disabled={saving}>
-                        {saving ? "Menyimpan..." : "Simpan Perubahan"}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button variant="outline-gold" size="sm" onClick={() => setEdit(true)}>
-                      Edit Profil Toko
-                    </Button>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
           </div>
 
           {/* Form Informasi Toko */}
