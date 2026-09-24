@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import Badge from "./Badge";
 import Button from "./Button";
 import { IconStar, IconCart } from "./Icons";
+import { useCart } from "../../app/contexts/CartContext";
 
 interface Product {
   id: string;
@@ -24,6 +25,24 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
+  const { addToCart } = useCart();
+
+  const handleAdd = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onAddToCart) {
+      onAddToCart(product.id);
+    } else {
+      addToCart({
+        productId: product.id,
+        name: product.name,
+        umkm: product.umkm,
+        price: product.price,
+        image: product.image,
+        qty: 1,
+      });
+    }
+  };
   return (
     <div
       data-figma-layer="ProductCard"
@@ -79,8 +98,9 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
         <div className="flex items-center justify-between" data-figma-layer="PriceCTA">
           <span className="text-[15px] font-bold text-[#1A1714]">{formatRp(product.price)}</span>
           <button
-            onClick={() => onAddToCart?.(product.id)}
-            className="w-8 h-8 rounded-[9px] bg-[#FDF6E3] border border-[#E8DDC0] text-[#C9A227] flex items-center justify-center hover:bg-[#C9A227] hover:text-white hover:border-[#C9A227] transition-all duration-200 shadow-sm"
+            onClick={handleAdd}
+            className="w-8 h-8 rounded-[9px] bg-[#FDF6E3] border border-[#E8DDC0] text-[#C9A227] flex items-center justify-center hover:bg-[#C9A227] hover:text-white hover:border-[#C9A227] transition-all duration-200 shadow-sm cursor-pointer"
+            title="Tambah ke Keranjang"
           >
             <IconCart className="w-4 h-4" />
           </button>

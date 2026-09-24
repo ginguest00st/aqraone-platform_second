@@ -12,20 +12,20 @@ import { umkmService, type UmkmWithCategory } from "../../services/umkm.service"
 
 const allProducts = [
   { id: "1",  name: "Keripik Pisang Original",  umkm: "Naraya Snack",    price: 25000,  rating: 4.8, stock: 120, image: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop&auto=format", badge: "hot" as const },
-  { id: "2",  name: "Batik Tulis Motif Parang", umkm: "Batik Nusantara", price: 185000, rating: 4.6, stock: 45,  image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop&auto=format", badge: "new" as const },
+  { id: "2",  name: "Batik Tulis Motif Parang", umkm: "Batik Nusantara", price: 185000, rating: 4.6, stock: 45,  image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=400&h=300&fit=crop&auto=format", badge: "new" as const },
   { id: "3",  name: "Kopi Arabika Gayo Aceh",   umkm: "Gayo Coffee",     price: 75000,  rating: 4.9, stock: 80,  image: "https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=400&h=300&fit=crop&auto=format", badge: "hot" as const },
   { id: "4",  name: "Tas Anyam Rotan Premium",  umkm: "Rattan Craft",    price: 145000, rating: 4.7, stock: 30,  image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop&auto=format" },
   { id: "5",  name: "Tempe Organik Homemade",   umkm: "Dapur Sehat",     price: 15000,  rating: 4.5, stock: 200, image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop&auto=format", badge: "new" as const },
   { id: "6",  name: "Gelang Perak Ukir Bali",   umkm: "Silver Bali",     price: 95000,  rating: 4.8, stock: 50,  image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400&h=300&fit=crop&auto=format" },
   { id: "7",  name: "Minyak Kelapa Murni 500ml",umkm: "Kopra Nusantara", price: 45000,  rating: 4.6, stock: 150, image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&h=300&fit=crop&auto=format" },
-  { id: "8",  name: "Tenun Ikat NTT Original",  umkm: "Tenun Flores",    price: 320000, rating: 4.9, stock: 20,  image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop&auto=format", badge: "hot" as const },
+  { id: "8",  name: "Tenun Ikat NTT Original",  umkm: "Tenun Flores",    price: 320000, rating: 4.9, stock: 20,  image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=400&h=300&fit=crop&auto=format", badge: "hot" as const },
   { id: "9",  name: "Sambal Matah Khas Bali",   umkm: "Dapur Bali",      price: 35000,  rating: 4.7, stock: 90,  image: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&h=300&fit=crop&auto=format" },
   { id: "10", name: "Jamu Kunyit Asam Segar",   umkm: "Warisan Herbal",  price: 20000,  rating: 4.5, stock: 60,  image: "https://images.unsplash.com/photo-1563822249548-9a72b6353cd1?w=400&h=300&fit=crop&auto=format", badge: "new" as const },
 ];
 
 const defaultUmkmSpotlight = [
   { name: "Mulya Snack & Heritage", category: "Kuliner", rating: 4.9, products: 5, location: "Yogyakarta", image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=200&h=200&fit=crop&auto=format" },
-  { name: "Batik Danar Solo", category: "Fashion", rating: 4.8, products: 4, location: "Surakarta", image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200&h=200&fit=crop&auto=format" },
+  { name: "Batik Danar Solo", category: "Fashion", rating: 4.8, products: 4, location: "Surakarta", image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=200&h=200&fit=crop&auto=format" },
   { name: "Gayo Mountain Coffee", category: "Kopi", rating: 4.9, products: 3, location: "Aceh Tengah", image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop&auto=format" },
   { name: "Lombok Craft & Rattan", category: "Kerajinan", rating: 4.8, products: 3, location: "Lombok", image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=200&h=200&fit=crop&auto=format" },
 ];
@@ -228,7 +228,7 @@ export default function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             { to: "/products?cat=Makanan",   img: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=700&h=420&fit=crop&auto=format", title: "Makanan & Minuman",  sub: "800+ produk kuliner lokal", tag: "Terpopuler" },
-            { to: "/products?cat=Fashion",   img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&h=420&fit=crop&auto=format", title: "Fashion & Batik",    sub: "Kain tradisional terpilih", tag: "Berkualitas" },
+            { to: "/products?cat=Fashion",   img: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=700&h=420&fit=crop&auto=format", title: "Fashion & Batik",    sub: "Kain tradisional terpilih", tag: "Berkualitas" },
             { to: "/products?cat=Kerajinan", img: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=700&h=420&fit=crop&auto=format", title: "Kerajinan Tangan",  sub: "Produk seni & handmade", tag: "Eksklusif" },
           ].map(b => (
             <Link key={b.to} to={b.to}

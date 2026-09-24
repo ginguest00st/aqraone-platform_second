@@ -80,7 +80,7 @@ export default function ProductSearchPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar cartCount={2} user={{ name: "Andi", role: "customer" }} />
+      <Navbar user={{ name: "Andi", role: "customer" }} />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {params.get("q") && (

@@ -5,6 +5,7 @@ import Button from "../../components/ui/Button";
 import { Stars, formatRp } from "../../components/ui/ProductCard";
 import Badge from "../../components/ui/Badge";
 import { supabase } from "../../lib/supabase";
+import { useCart } from "../../app/contexts/CartContext";
 
 const defaultImages = [
   "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=600&h=500&fit=crop&auto=format",
@@ -20,6 +21,7 @@ export default function ProductDetailPage() {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const navigate = useNavigate();
+  const { addToCart, buyNow } = useCart();
 
   useEffect(() => {
     if (!id) return;
@@ -36,20 +38,16 @@ export default function ProductDetailPage() {
       `)
       .eq("id", id)
       .maybeSingle()
-      .then((res) => {
-        if (res.data) {
-          setProduct(res.data);
-          if (res.data.product_variants && res.data.product_variants.length > 0) {
-            setSelectedVariant(res.data.product_variants[0]);
+      .then((res: any) => {
+        const prodData = res?.data;
+        if (prodData) {
+          setProduct(prodData);
+          if (prodData.product_variants && prodData.product_variants.length > 0) {
+            setSelectedVariant(prodData.product_variants[0]);
           }
         }
       });
   }, [id]);
-
-  const handleAddToCart = () => {
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
-  };
 
   const images = product?.gambar_url ? [product.gambar_url, ...defaultImages.slice(1)] : defaultImages;
   const productName = product?.nama_produk || "Keripik Pisang Original";
@@ -59,9 +57,38 @@ export default function ProductDetailPage() {
   const stock = selectedVariant?.stock_levels?.sisa_stok ?? 100;
   const variants = product?.product_variants || [];
 
+  const handleAddToCart = () => {
+    addToCart({
+      productId: id || product?.id || "prod-default",
+      variantId: selectedVariant?.id,
+      name: productName,
+      umkm: storeName,
+      variant: selectedVariant?.nama_varian || (variants.length > 0 ? variants[0].nama_varian : "Standard"),
+      price,
+      qty,
+      image: images[0],
+    });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2500);
+  };
+
+  const handleBuyNow = () => {
+    buyNow({
+      productId: id || product?.id || "prod-default",
+      variantId: selectedVariant?.id,
+      name: productName,
+      umkm: storeName,
+      variant: selectedVariant?.nama_varian || (variants.length > 0 ? variants[0].nama_varian : "Standard"),
+      price,
+      qty,
+      image: images[0],
+    });
+    navigate("/checkout");
+  };
+
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar cartCount={added ? 1 : 0} user={{ name: "Andi", role: "customer" }} />
+      <Navbar user={{ name: "Andi", role: "customer" }} />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Breadcrumb */}
@@ -149,10 +176,20 @@ export default function ProductDetailPage() {
 
             {/* CTA */}
             <div className="flex gap-3 pt-2">
-              <Button variant="outline-gold" size="lg" onClick={handleAddToCart} className="flex-1 justify-center">
-                {added ? "✓ Ditambahkan!" : "Tambah ke Keranjang"}
+              <Button
+                variant={added ? "secondary" : "outline-gold"}
+                size="lg"
+                onClick={handleAddToCart}
+                className="flex-1 justify-center transition-all cursor-pointer font-semibold"
+              >
+                {added ? "✓ Masuk Keranjang!" : "Tambah ke Keranjang"}
               </Button>
-              <Button variant="primary" size="lg" onClick={() => navigate("/checkout")} className="flex-1 justify-center">
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={handleBuyNow}
+                className="flex-1 justify-center shadow-md hover:shadow-lg transition-all cursor-pointer font-semibold"
+              >
                 Beli Sekarang
               </Button>
             </div>

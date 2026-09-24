@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router";
 import { useState } from "react";
 import { IconSearch, IconCart, IconBell, IconUser, IconMenu, IconLogout, IconHome, IconPackage } from "./Icons";
 import { useAuth } from "../../app/contexts/AuthContext";
+import { useCart } from "../../app/contexts/CartContext";
 
 interface NavbarProps {
   cartCount?: number;
@@ -9,12 +10,16 @@ interface NavbarProps {
   user?: { name: string; role: string };
 }
 
-export default function Navbar({ cartCount = 0, notifCount = 0, user: propUser }: NavbarProps) {
+export default function Navbar({ cartCount: propCartCount, notifCount = 0, user: propUser }: NavbarProps) {
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { user: authUser, logout } = useAuth();
+  const { cartCount: liveCartCount } = useCart();
   const user = authUser || propUser;
+
+  // Use live cart count from CartContext
+  const cartCount = liveCartCount;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
