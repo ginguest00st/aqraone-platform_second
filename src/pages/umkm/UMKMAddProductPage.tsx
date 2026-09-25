@@ -9,6 +9,7 @@ import { umkmService, type UmkmWithCategory } from "../../services/umkm.service"
 import { categoryService } from "../../services/category.service";
 import { productService, type VariantInput } from "../../services/product.service";
 import type { KategoriProduk, ProductStatus } from "../../types/database.types";
+import { compressImageFile } from "../../lib/imageUtils";
 
 const sidebarItems = [
   { to: "/umkm/dashboard", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
@@ -90,16 +91,21 @@ export default function UMKMAddProductPage() {
   }, [user]);
 
   // Handle Upload Foto dari Device
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setErrorMessage("Ukuran file gambar maksimal 2MB.");
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMessage("Ukuran file gambar maksimal 5MB.");
         return;
       }
-      const objectUrl = URL.createObjectURL(file);
-      setFilePreview(objectUrl);
-      setGambarUrl(objectUrl);
+      try {
+        const compressedDataUrl = await compressImageFile(file, 800, 0.85);
+        setFilePreview(compressedDataUrl);
+        setGambarUrl(compressedDataUrl);
+      } catch (err: unknown) {
+        console.error("Gagal mengompres gambar:", err);
+        setErrorMessage("Gagal memproses gambar yang diunggah.");
+      }
     }
   };
 

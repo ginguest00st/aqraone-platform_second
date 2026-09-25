@@ -3,6 +3,7 @@ import Badge from "./Badge";
 import Button from "./Button";
 import { IconStar, IconCart } from "./Icons";
 import { useCart } from "../../app/contexts/CartContext";
+import { sanitizeProductImageUrl, getProductFallbackImage } from "../../lib/imageUtils";
 
 interface Product {
   id: string;
@@ -53,9 +54,13 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
       <Link to={`/products/${product.id}`} data-figma-layer="ProductImage">
         <div className="relative h-44 bg-[#F5F4F1] overflow-hidden">
           <img
-            src={product.image}
+            src={sanitizeProductImageUrl(product.image, product.name)}
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = getProductFallbackImage(product.name);
+            }}
           />
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
