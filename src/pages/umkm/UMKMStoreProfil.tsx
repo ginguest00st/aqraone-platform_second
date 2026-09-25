@@ -155,6 +155,7 @@ export default function UMKMStoreProfil() {
           avatarBg="bg-[#FDF6E3] border-2 border-[#C9A227]"
           avatarTextColor="text-[#C9A227]"
           notifCount={0}
+          showSearch={false}
         />
         <main className="flex-1 overflow-y-auto p-6 space-y-5">
           {feedback && (

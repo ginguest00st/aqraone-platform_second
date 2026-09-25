@@ -155,10 +155,6 @@ export default function UMKMDashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#ABA9A4] w-3.5 h-3.5" />
-              <input placeholder="Cari..." className="border border-[#E8E6E1] bg-[#FAFAF8] rounded-[10px] pl-8 pr-4 py-2 text-[12px] outline-none focus:border-[#C9A227] w-40" />
-            </div>
             <button className="relative p-2 hover:bg-[#F5F4F1] rounded-[10px] text-[#7C7770]">
               <IconBell className="w-5 h-5" />
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#C0392B] text-white text-[9px] font-bold rounded-full flex items-center justify-center">0</span>
