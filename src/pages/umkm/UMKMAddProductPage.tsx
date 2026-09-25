@@ -32,7 +32,7 @@ const SAMPLE_IMAGES = [
   "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=600&fit=crop&auto=format",
   "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&fit=crop&auto=format",
   "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&fit=crop&auto=format",
-  "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&fit=crop&auto=format",
+  "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&fit=crop&auto=format",
   "https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=600&fit=crop&auto=format",
 ];
 
