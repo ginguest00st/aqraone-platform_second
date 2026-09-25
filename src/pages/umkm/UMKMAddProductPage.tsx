@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import Sidebar from "../../components/ui/Sidebar";
 import { Input, Select } from "../../components/ui/Input";
@@ -40,6 +40,8 @@ export default function UMKMAddProductPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [umkm, setUmkm] = useState<UmkmWithCategory | null>(null);
   const [categories, setCategories] = useState<KategoriProduk[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -53,7 +55,11 @@ export default function UMKMAddProductPage() {
   const [hargaDasar, setHargaDasar] = useState("25000");
   const [stokDasar, setStokDasar] = useState("100");
   const [status, setStatus] = useState<ProductStatus>("AKTIF");
+
+  // State Foto Produk & Tab
   const [gambarUrl, setGambarUrl] = useState(SAMPLE_IMAGES[0]);
+  const [activeTab, setActiveTab] = useState<"upload" | "sample">("upload");
+  const [filePreview, setFilePreview] = useState<string | null>(null);
 
   // Variants state
   const [hasVariants, setHasVariants] = useState(false);
@@ -66,11 +72,9 @@ export default function UMKMAddProductPage() {
       if (!user) return;
       setLoadingInitial(true);
       try {
-        // 1. Ambil data UMKM pengguna
         const { data: uData } = await umkmService.getUmkmByUserId(user.id);
         if (uData) setUmkm(uData);
 
-        // 2. Ambil master kategori produk dari Supabase
         const { data: cData } = await categoryService.getKategoriProduk();
         if (cData && cData.length > 0) {
           setCategories(cData);
@@ -84,6 +88,29 @@ export default function UMKMAddProductPage() {
     }
     init();
   }, [user]);
+
+  // Handle Upload Foto dari Device
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setErrorMessage("Ukuran file gambar maksimal 2MB.");
+        return;
+      }
+      const objectUrl = URL.createObjectURL(file);
+      setFilePreview(objectUrl);
+      setGambarUrl(objectUrl);
+    }
+  };
+
+  // Handle Hapus Foto Pilihan
+  const handleRemoveFile = () => {
+    setFilePreview(null);
+    setGambarUrl("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const addVariant = () =>
     setVariants((v) => [
@@ -100,7 +127,7 @@ export default function UMKMAddProductPage() {
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!umkm) {
-      setErrorMessage("Profil toko UMKM tidak ditemukan. Anda harus terdaftar sebagai toko UMKM.");
+      setErrorMessage("Profil toko UMKM tidak ditemukan.");
       return;
     }
     if (!namaProduk.trim()) {
@@ -112,7 +139,6 @@ export default function UMKMAddProductPage() {
     setErrorMessage(null);
 
     try {
-      // Siapkan varian dan stok yang akan disimpan
       let variantInputs: VariantInput[] = [];
 
       if (hasVariants && variants.length > 0) {
@@ -126,7 +152,6 @@ export default function UMKMAddProductPage() {
           };
         });
       } else {
-        // Single default variant
         variantInputs = [
           {
             nama_varian: "Default",
@@ -148,10 +173,9 @@ export default function UMKMAddProductPage() {
       });
 
       if (error || !data) {
-        throw error || new Error("Gagal menyimpan produk ke Supabase");
+        throw error || new Error("Gagal menyimpan produk ke database.");
       }
 
-      // Berhasil
       navigate("/umkm/products");
     } catch (err: unknown) {
       setErrorMessage((err as Error).message || "Terjadi kesalahan saat menyimpan produk.");
@@ -200,19 +224,6 @@ export default function UMKMAddProductPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* Status Toko Alert jika Belum Disetujui */}
-          {umkm && umkm.status_verifikasi !== "APPROVED" && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-800 text-xs flex items-start gap-3">
-              <span className="text-base">ℹ️</span>
-              <div>
-                <p className="font-bold text-amber-900">Perhatian: Status Toko {umkm.status_verifikasi}</p>
-                <p className="mt-0.5 text-amber-700">
-                  Produk yang Anda buat sekarang akan tersimpan dengan aman di database. Namun, produk baru akan ditampilkan ke katalog customer setelah toko diverifikasi oleh Admin.
-                </p>
-              </div>
-            </div>
-          )}
-
           {errorMessage && (
             <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-rose-800 text-xs flex items-center justify-between">
               <span>{errorMessage}</span>
@@ -222,7 +233,7 @@ export default function UMKMAddProductPage() {
             </div>
           )}
 
-          {/* Basic Info */}
+          {/* Informasi Produk */}
           <div className="bg-white rounded-2xl border border-[#E5E5E5] p-6">
             <h2 className="font-semibold text-[#202020] mb-4">Informasi Produk</h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -277,42 +288,120 @@ export default function UMKMAddProductPage() {
             </div>
           </div>
 
-          {/* Foto Produk */}
+          {/* Foto Produk (Device & Sample) */}
           <div className="bg-white rounded-2xl border border-[#E5E5E5] p-6">
             <h2 className="font-semibold text-[#202020] mb-1">Foto Produk</h2>
-            <p className="text-xs text-[#8A8780] mb-4">Pilih salah satu sampel foto atau tempel URL gambar produk Anda</p>
-            <div className="grid grid-cols-5 gap-3 mb-4">
-              {SAMPLE_IMAGES.map((img, i) => (
-                <div
-                  key={i}
-                  onClick={() => setGambarUrl(img)}
-                  className={`aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all relative ${
-                    gambarUrl === img ? "border-[#C9A227] shadow-md ring-2 ring-[#C9A227]/30" : "border-transparent opacity-70 hover:opacity-100"
-                  }`}
-                >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                  {gambarUrl === img && (
-                    <div className="absolute top-1 right-1 bg-[#C9A227] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">
-                      ✓
-                    </div>
-                  )}
-                </div>
-              ))}
+            <p className="text-xs text-[#8A8780] mb-4">
+              Pilih foto produk langsung dari perangkat HP/Laptop Anda.
+            </p>
+
+            {/* Tab Navigation */}
+            <div className="flex border-b border-[#E5E5E5] mb-5">
+              <button
+                type="button"
+                onClick={() => setActiveTab("upload")}
+                className={`pb-2.5 px-3 text-xs font-semibold transition-all border-b-2 ${
+                  activeTab === "upload"
+                    ? "border-[#C9A227] text-[#C9A227]"
+                    : "border-transparent text-[#8A8780] hover:text-[#202020]"
+                }`}
+              >
+                📁 Upload dari Perangkat
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("sample")}
+                className={`pb-2.5 px-3 text-xs font-semibold transition-all border-b-2 ${
+                  activeTab === "sample"
+                    ? "border-[#C9A227] text-[#C9A227]"
+                    : "border-transparent text-[#8A8780] hover:text-[#202020]"
+                }`}
+              >
+                🖼️ Sampel Foto
+              </button>
             </div>
-            <Input
-              label="URL Gambar Kustom"
-              placeholder="https://images.unsplash.com/..."
-              value={gambarUrl}
-              onChange={(e) => setGambarUrl(e.target.value)}
-            />
+
+            {/* TAB 1: UPLOAD DARI PERANGKAT */}
+            {activeTab === "upload" && (
+              <div className="space-y-3">
+                {filePreview ? (
+                  /* Tampilan setelah foto dipilih */
+                  <div className="border border-[#E5E5E5] rounded-2xl p-6 bg-[#FAFAF8] flex flex-col items-center justify-center text-center">
+                    {/* Container Foto Preview */}
+                    <div className="relative group mx-auto">
+                      <img
+                        src={filePreview}
+                        alt="Preview Foto"
+                        className="w-36 h-36 object-cover rounded-xl border border-[#E5E5E5] shadow-sm"
+                      />
+
+                      {/* Tombol Hapus Foto (Lingkaran Silang Merah di Pojok Kanan Atas) */}
+                      <button
+                        type="button"
+                        onClick={handleRemoveFile}
+                        title="Hapus foto"
+                        className="absolute -top-2 -right-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs font-bold shadow-md transition-transform hover:scale-110 active:scale-95"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Tampilan Dropzone awal (belum ada foto) */
+                  <div className="border-2 border-dashed border-[#E5E5E5] hover:border-[#C9A227] rounded-2xl p-6 text-center relative transition-all bg-[#FAFAF8]">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div className="py-4 flex flex-col items-center justify-center">
+                      <div className="w-12 h-12 rounded-full bg-[#F5F4F0] flex items-center justify-center mb-2 text-[#8A8780] text-xl">
+                        📤
+                      </div>
+                      <p className="text-xs font-semibold text-[#202020]">Pilih File dari Perangkat</p>
+                      <p className="text-[11px] text-[#8A8780] mt-1">Format JPG, PNG, WEBP (Maksimal 2MB)</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: SAMPEL PRESET FOTO */}
+            {activeTab === "sample" && (
+              <div className="grid grid-cols-5 gap-3">
+                {SAMPLE_IMAGES.map((img, i) => (
+                  <div
+                    key={i}
+                    onClick={() => {
+                      setGambarUrl(img);
+                      setFilePreview(null);
+                    }}
+                    className={`aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all relative ${
+                      gambarUrl === img
+                        ? "border-[#C9A227] shadow-md ring-2 ring-[#C9A227]/30"
+                        : "border-transparent opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    {gambarUrl === img && (
+                      <div className="absolute top-1 right-1 bg-[#C9A227] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold">
+                        ✓
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Variants Toggle & Controls */}
+          {/* Varian Produk */}
           <div className="bg-white rounded-2xl border border-[#E5E5E5] p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-semibold text-[#202020]">Varian & Pilihan Produk</h2>
-                <p className="text-xs text-[#8A8780]">Aktifkan jika produk memiliki variasi ukuran, warna, atau rasa</p>
+                <h2 className="font-semibold text-[#202020]">Varian Produk</h2>
+                <p className="text-xs text-[#8A8780]">Aktifkan jika memiliki variasi ukuran atau warna</p>
               </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#1A1714]">
@@ -392,11 +481,12 @@ export default function UMKMAddProductPage() {
               </div>
             ) : (
               <div className="p-4 bg-[#FAFAF8] rounded-xl border border-dashed border-[#E8E6E1] text-center text-xs text-[#8A8780]">
-                Produk ini menggunakan stok dan harga dasar tunggal (tanpa varian). Centang "Gunakan Varian" di atas jika memiliki beberapa jenis varian.
+                Produk ini menggunakan stok dan harga dasar tunggal.
               </div>
             )}
           </div>
 
+          {/* Submit Action */}
           <div className="flex gap-3">
             <Button
               variant="secondary"
