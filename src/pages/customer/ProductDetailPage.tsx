@@ -6,17 +6,13 @@ import { Stars, formatRp } from "../../components/ui/ProductCard";
 import Badge from "../../components/ui/Badge";
 import { supabase } from "../../lib/supabase";
 import { useCart } from "../../app/contexts/CartContext";
-
-const defaultImages = [
-  "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=600&h=500&fit=crop&auto=format",
-  "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=500&fit=crop&auto=format",
-  "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&h=500&fit=crop&auto=format",
-];
+import { getProductFallbackImage } from "../../lib/imageUtils";
 
 export default function ProductDetailPage() {
   const { id } = useParams();
   const [product, setProduct] = useState<any>(null);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
@@ -25,6 +21,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (!id) return;
+    setLoading(true);
     supabase
       .from("products")
       .select(`
@@ -46,15 +43,23 @@ export default function ProductDetailPage() {
             setSelectedVariant(prodData.product_variants[0]);
           }
         }
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, [id]);
 
-  const images = product?.gambar_url ? [product.gambar_url, ...defaultImages.slice(1)] : defaultImages;
-  const productName = product?.nama_produk || "Keripik Pisang Original";
-  const storeName = product?.umkm?.nama_toko || "Mulya Snack & Heritage";
-  const categoryName = product?.kategori_produk?.nama_kategori || "Makanan Ringan";
+  const productName = product?.nama_produk || "Batik Kawung";
+  const storeName = product?.umkm?.nama_toko || "Batik Danar Solo";
+  const categoryName = product?.kategori_produk?.nama_kategori || "Pakaian & Tekstil";
+  const fallbackImg = getProductFallbackImage(categoryName || productName);
+  const rawImage = product?.gambar_url;
+  const validMainImage = (rawImage && typeof rawImage === "string" && !rawImage.startsWith("blob:"))
+    ? rawImage
+    : fallbackImg;
+  const images = [validMainImage];
   const price = selectedVariant?.harga ? Number(selectedVariant.harga) : 25000;
-  const stock = selectedVariant?.stock_levels?.sisa_stok ?? 100;
+  const stock = selectedVariant?.stock_levels?.sisa_stok ?? 22;
   const variants = product?.product_variants || [];
 
   const handleAddToCart = () => {
@@ -66,7 +71,7 @@ export default function ProductDetailPage() {
       variant: selectedVariant?.nama_varian || (variants.length > 0 ? variants[0].nama_varian : "Standard"),
       price,
       qty,
-      image: images[0],
+      image: validMainImage,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2500);
@@ -81,10 +86,22 @@ export default function ProductDetailPage() {
       variant: selectedVariant?.nama_varian || (variants.length > 0 ? variants[0].nama_varian : "Standard"),
       price,
       qty,
-      image: images[0],
+      image: validMainImage,
     });
     navigate("/checkout");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8F8F6]">
+        <Navbar user={{ name: "Andi", role: "customer" }} />
+        <div className="max-w-4xl mx-auto px-4 py-24 text-center">
+          <div className="w-10 h-10 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm font-semibold text-[#202020]">Memuat informasi produk...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
@@ -95,7 +112,7 @@ export default function ProductDetailPage() {
         <div className="flex items-center gap-2 text-xs text-[#6B6B6B] mb-6">
           <Link to="/home" className="hover:text-[#D4AF37]">Home</Link>
           <span>/</span>
-          <Link to={`/products?cat=${encodeURIComponent(categoryName)}`} className="hover:text-[#D4AF37]">{categoryName}</Link>
+          <Link to={`/products?cat=${encodeURIComponent(categoryName)}`} className="hover:text-[#D4AF37]">{categoryName || "Produk"}</Link>
           <span>/</span>
           <span className="text-[#202020] truncate max-w-xs">{productName}</span>
         </div>
@@ -104,17 +121,40 @@ export default function ProductDetailPage() {
           {/* Image Gallery */}
           <div className="space-y-3">
             <div className="relative rounded-2xl overflow-hidden bg-white border border-[#E5E5E5] h-96">
-              <img src={images[activeImg]} alt="Product" className="w-full h-full object-cover" />
+              <img
+                src={images[activeImg] || validMainImage}
+                alt={productName}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = fallbackImg;
+                }}
+              />
               <div className="absolute top-3 left-3"><Badge variant="hot">Terlaris</Badge></div>
             </div>
-            <div className="flex gap-2">
-              {images.map((img, i) => (
-                <button key={i} onClick={() => setActiveImg(i)}
-                  className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${activeImg === i ? "border-[#D4AF37]" : "border-[#E5E5E5]"}`}>
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
+            {images.length > 1 && (
+              <div className="flex gap-2">
+                {images.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveImg(i)}
+                    className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${
+                      activeImg === i ? "border-[#D4AF37]" : "border-[#E5E5E5]"
+                    }`}
+                  >
+                    <img
+                      src={img}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = fallbackImg;
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Info */}

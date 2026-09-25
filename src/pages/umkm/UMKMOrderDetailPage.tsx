@@ -35,32 +35,51 @@ const umkmLogo = (
 export default function UMKMOrderDetailPage() {
   const { id: orderId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<Order | null>(() => {
+    return orderId ? orderService.getOrderById(orderId) : null;
+  });
   const [updating, setUpdating] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     if (!orderId) { setNotFound(true); return; }
-    const found = orderService.getOrderById(orderId);
-    if (found) {
-      setOrder(found);
-    } else {
-      setNotFound(true);
-    }
+
+    const refreshOrder = () => {
+      const found = orderService.getOrderById(orderId);
+      if (found) {
+        setOrder({ ...found });
+        setNotFound(false);
+      } else {
+        setNotFound(true);
+      }
+    };
+
+    refreshOrder();
+
+    // Fetch database asli
+    orderService.fetchOrdersFromDatabase().then(() => {
+      refreshOrder();
+    });
+
+    // Berlangganan event sinkronisasi real-time
+    const unsubscribe = orderService.subscribe(() => {
+      refreshOrder();
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [orderId]);
 
-  const handleUpdateStatus = (newStatus: "DIPROSES" | "DIKIRIM" | "SELESAI") => {
+  const handleUpdateStatus = async (newStatus: "DIPROSES" | "DIKIRIM" | "SELESAI") => {
     if (!order) return;
     setUpdating(true);
-    setTimeout(() => {
-      const updated = orderService.updateOrderStatus(
-        order.id,
-        newStatus,
-        newStatus === "DIKIRIM" ? (order.trackingNumber || `JNE-${Date.now().toString().slice(-8)}`) : undefined
-      );
-      if (updated) setOrder({ ...updated });
-      setUpdating(false);
-    }, 700);
+    const tracking = newStatus === "DIKIRIM" ? (order.trackingNumber && order.trackingNumber !== "—" ? order.trackingNumber : `JNE-${Date.now().toString().slice(-8)}`) : undefined;
+    const updated = await orderService.updateOrderStatus(order.id, newStatus, tracking);
+    if (updated) {
+      setOrder({ ...updated });
+    }
+    setUpdating(false);
   };
 
   if (notFound) {
@@ -118,106 +137,131 @@ export default function UMKMOrderDetailPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="grid md:grid-cols-3 gap-5">
-            <div className="md:col-span-2 space-y-5">
-
-              {/* Informasi Customer */}
-              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5">
-                <h2 className="font-semibold text-[#1A1714] mb-3">👤 Informasi Customer</h2>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-[#7C7770]">Nama: </span><strong>{order.customer}</strong></div>
-                  <div><span className="text-[#7C7770]">HP: </span><strong>{order.customerPhone}</strong></div>
-                  <div className="col-span-2">
-                    <span className="text-[#7C7770]">Alamat Pengiriman: </span>
-                    <strong>{order.shippingAddress}</strong>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl">
+            {/* Kolom Kiri: Detail Pelanggan & Barang */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Info Pelanggan */}
+              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5 shadow-xs">
+                <h2 className="font-semibold text-[#1A1714] mb-3 flex items-center gap-2">
+                  <span>👤</span> Informasi Customer
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-[#7C7770]">Nama Pelanggan</p>
+                    <p className="font-semibold text-[#1A1714] mt-0.5">{order.customer}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#7C7770]">Nomor HP</p>
+                    <p className="font-semibold text-[#1A1714] mt-0.5">{order.customerPhone}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-xs text-[#7C7770]">Alamat Pengiriman</p>
+                    <p className="font-medium text-[#1A1714] mt-0.5 leading-relaxed">{order.shippingAddress}</p>
                   </div>
                   {order.shippingNotes && (
-                    <div className="col-span-2">
-                      <span className="text-[#7C7770]">Catatan: </span>
-                      <span className="italic text-[#7C7770]">{order.shippingNotes}</span>
+                    <div className="md:col-span-2 pt-2 border-t border-[#F0EEE9]">
+                      <p className="text-xs text-[#7C7770]">Catatan Pembeli</p>
+                      <p className="italic text-[#7C7770] mt-0.5 text-xs">{order.shippingNotes}</p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Produk yang Dipesan */}
-              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5">
-                <h2 className="font-semibold text-[#1A1714] mb-3">📦 Produk Dipesan</h2>
+              {/* Produk Dipesan */}
+              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5 shadow-xs">
+                <h2 className="font-semibold text-[#1A1714] mb-4 flex items-center gap-2">
+                  <span>📦</span> Produk Dipesan
+                </h2>
                 <div className="divide-y divide-[#F0EEE9]">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
+                  {order.items.map((item) => (
+                    <div key={item.id || item.productId} className="py-3.5 first:pt-0 last:pb-0 flex items-center gap-4">
                       <img
                         src={item.image}
                         alt={item.name}
                         className="w-14 h-14 rounded-xl object-cover border border-[#E8E6E1] shrink-0"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#1A1714] truncate">{item.name}</p>
-                        <p className="text-xs text-[#7C7770]">Varian: {item.variant} · ×{item.qty}</p>
-                        <p className="text-xs text-[#ABA9A4]">{item.umkm}</p>
+                        <p className="font-semibold text-[#1A1714] text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-[#7C7770] mt-0.5">{item.variant} · ×{item.qty}</p>
+                        <p className="text-xs text-[#C9A227]">{item.umkm || order.umkm}</p>
                       </div>
-                      <p className="font-bold text-[#1A1714] shrink-0">{formatRp(item.subtotal)}</p>
+                      <p className="font-bold text-[#1A1714] text-sm shrink-0">
+                        {formatRp(item.subtotal || item.price * item.qty)}
+                      </p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Ringkasan Pembayaran */}
-              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5">
-                <h2 className="font-semibold text-[#1A1714] mb-3">💳 Ringkasan Pembayaran</h2>
+              {/* Rincian Pembayaran */}
+              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5 shadow-xs">
+                <h2 className="font-semibold text-[#1A1714] mb-3 flex items-center gap-2">
+                  <span>💳</span> Ringkasan Pembayaran
+                </h2>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-[#7C7770]">Metode</span>
-                    <span className="font-medium">{order.paymentMethod}</span>
+                  <div className="flex justify-between text-[#7C7770]">
+                    <span>Metode</span>
+                    <span className="font-medium text-[#1A1714]">{order.paymentMethod}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C7770]">No. Referensi</span>
-                    <span className="font-mono text-xs">{order.paymentRef}</span>
+                  <div className="flex justify-between text-[#7C7770]">
+                    <span>No. Referensi</span>
+                    <span className="font-mono text-xs text-[#1A1714]">{order.paymentRef}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C7770]">Subtotal Produk</span>
-                    <span>{formatRp(order.subtotal)}</span>
+                  <div className="flex justify-between text-[#7C7770]">
+                    <span>Subtotal Produk</span>
+                    <span className="font-medium text-[#1A1714]">{formatRp(order.subtotal)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C7770]">Ongkos Kirim ({order.courier})</span>
-                    <span>{formatRp(order.shippingCost)}</span>
+                  <div className="flex justify-between text-[#7C7770]">
+                    <span>Ongkos Kirim ({order.courier})</span>
+                    <span className="font-medium text-[#1A1714]">{formatRp(order.shippingCost)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C7770]">Biaya Platform</span>
-                    <span>{formatRp(order.platformFee)}</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t border-[#E8E6E1]">
-                    <span className="font-semibold text-[#1A1714]">Total Dibayar</span>
-                    <strong className="text-base text-[#1A1714]">{formatRp(order.total)}</strong>
+                  {order.platformFee > 0 && (
+                    <div className="flex justify-between text-[#7C7770]">
+                      <span>Biaya Platform</span>
+                      <span className="font-medium text-[#1A1714]">{formatRp(order.platformFee)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-base text-[#1A1714] pt-2 border-t border-[#F0EEE9]">
+                    <span>Total Dibayar</span>
+                    <span className="text-[#C9A227]">{formatRp(order.total)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Info Pengiriman */}
-              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5">
-                <h2 className="font-semibold text-[#1A1714] mb-3">🚚 Info Pengiriman</h2>
+              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5 shadow-xs">
+                <h2 className="font-semibold text-[#1A1714] mb-3 flex items-center gap-2">
+                  <span>🚚</span> Info Pengiriman
+                </h2>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-[#7C7770]">Kurir: </span><strong>{order.courier}</strong></div>
-                  <div><span className="text-[#7C7770]">Layanan: </span><strong>{order.courierService || "-"}</strong></div>
-                  {order.trackingNumber && (
-                    <div className="col-span-2">
-                      <span className="text-[#7C7770]">No. Resi: </span>
-                      <strong className="font-mono">{order.trackingNumber}</strong>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-xs text-[#7C7770]">Kurir</p>
+                    <p className="font-semibold text-[#1A1714] mt-0.5">{order.courier}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[#7C7770]">Layanan</p>
+                    <p className="font-semibold text-[#1A1714] mt-0.5">{order.courierService || "Reguler"}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-[#7C7770]">Nomor Resi</p>
+                    <p className="font-mono font-bold text-[#C9A227] mt-0.5">
+                      {order.trackingNumber && order.trackingNumber !== "—" ? order.trackingNumber : "Belum diterbitkan"}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Kolom Kanan: Timeline & Aksi */}
-            <div className="space-y-5">
-              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5">
+            {/* Kolom Kanan: Status & Kelola */}
+            <div className="space-y-6">
+              {/* Status Timeline */}
+              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5 shadow-xs">
                 <h2 className="font-semibold text-[#1A1714] mb-3">Status Pesanan</h2>
                 <Timeline steps={timelineSteps} />
               </div>
 
               {/* Tombol Aksi UMKM */}
-              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5 space-y-3">
+              <div className="bg-white rounded-2xl border border-[#E8E6E1] p-5 space-y-3 shadow-xs">
                 <h2 className="font-semibold text-[#1A1714] mb-1">Kelola Pesanan</h2>
                 {order.orderStatus === "BARU" && (
                   <Button
@@ -245,7 +289,7 @@ export default function UMKMOrderDetailPage() {
                   <Button
                     variant="primary"
                     size="lg"
-                    className="w-full justify-center"
+                    className="w-full justify-center bg-emerald-600 hover:bg-emerald-700 text-white"
                     onClick={() => handleUpdateStatus("SELESAI")}
                     disabled={updating}
                   >
@@ -253,11 +297,11 @@ export default function UMKMOrderDetailPage() {
                   </Button>
                 )}
                 {order.orderStatus === "SELESAI" && (
-                  <div className="text-center py-3 bg-green-50 rounded-xl border border-green-200">
-                    <p className="text-green-700 font-semibold text-sm">✅ Pesanan Selesai</p>
+                  <div className="text-center py-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                    <p className="text-emerald-700 font-semibold text-sm">✅ Pesanan Selesai</p>
                   </div>
                 )}
-                <Link to="/umkm/transactions">
+                <Link to="/umkm/transactions" className="block">
                   <Button variant="secondary" size="md" className="w-full justify-center mt-1">
                     Kembali ke Daftar
                   </Button>
@@ -270,4 +314,3 @@ export default function UMKMOrderDetailPage() {
     </div>
   );
 }
-

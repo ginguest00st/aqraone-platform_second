@@ -34,7 +34,7 @@ const umkmLogo = (
 
 function formatRp(n: number) { return "Rp" + n.toLocaleString("id-ID"); }
 
-// Nama/ID UMKM aktif. "ALL" = tampilkan semua (demo mode).
+// Nama/ID UMKM aktif. "ALL" = tampilkan semua toko mitra dalam demo mode
 const ACTIVE_UMKM = "ALL";
 
 export default function UMKMTransactionsPage() {
@@ -53,9 +53,20 @@ export default function UMKMTransactionsPage() {
 
   useEffect(() => {
     loadOrders();
-    // Poll setiap 3 detik agar pesanan baru dari customer langsung muncul
-    const interval = setInterval(loadOrders, 3000);
-    return () => clearInterval(interval);
+
+    // 1. Fetch data asli dari database Supabase
+    orderService.fetchOrdersFromDatabase().then(() => {
+      loadOrders();
+    });
+
+    // 2. Berlangganan event real-time (antar-tab & Supabase)
+    const unsubscribe = orderService.subscribe(() => {
+      loadOrders();
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Statistik dinamis
@@ -79,22 +90,26 @@ export default function UMKMTransactionsPage() {
 
   const filtered = activeTab === "all" ? orders : orders.filter((o) => o.orderStatus === activeTab);
 
-  const handleProses = (orderId: string) => {
+  const handleProses = async (orderId: string) => {
     setUpdating(orderId);
-    setTimeout(() => {
-      orderService.updateOrderStatus(orderId, "DIPROSES");
-      loadOrders();
-      setUpdating(null);
-    }, 600);
+    await orderService.updateOrderStatus(orderId, "DIPROSES");
+    loadOrders();
+    setUpdating(null);
   };
 
-  const handleKirim = (orderId: string, tracking?: string) => {
+  const handleKirim = async (orderId: string, tracking?: string) => {
     setUpdating(orderId);
-    setTimeout(() => {
-      orderService.updateOrderStatus(orderId, "DIKIRIM", tracking || `JNE-${Date.now().toString().slice(-8)}`);
-      loadOrders();
-      setUpdating(null);
-    }, 600);
+    const resi = tracking && tracking !== "—" ? tracking : `JNE-${Date.now().toString().slice(-8)}`;
+    await orderService.updateOrderStatus(orderId, "DIKIRIM", resi);
+    loadOrders();
+    setUpdating(null);
+  };
+
+  const handleSelesai = async (orderId: string) => {
+    setUpdating(orderId);
+    await orderService.updateOrderStatus(orderId, "SELESAI");
+    loadOrders();
+    setUpdating(null);
   };
 
   return (
@@ -103,59 +118,61 @@ export default function UMKMTransactionsPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <PanelHeader
           title="Transaksi Masuk"
-          subtitle={`${orders.length} pesanan aktif`}
+          subtitle={`${orders.length} pesanan aktif dari database`}
           avatarLabel="U"
           avatarBg="bg-[#FDF6E3] border-2 border-[#C9A227]"
           avatarTextColor="text-[#C9A227]"
           notifCount={jumlahBaru}
         />
 
-        <main className="flex-1 overflow-y-auto p-6 space-y-4">
-
-          {/* Mini stat strip */}
-          <div className="grid grid-cols-4 gap-3">
+        <main className="flex-1 overflow-y-auto p-6">
+          {/* Quick Stat Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
               { label: "Pesanan Baru", value: String(jumlahBaru), color: "border-l-amber-400", bg: "bg-amber-50" },
               { label: "Diproses", value: String(jumlahDiproses), color: "border-l-sky-400", bg: "bg-sky-50" },
               { label: "Dikirim", value: String(jumlahDikirim), color: "border-l-blue-400", bg: "bg-blue-50" },
               {
-                label: "Pendapatan Hari Ini",
-                value: pendapatanHariIni > 0 ? `Rp${Math.round(pendapatanHariIni / 1000)}rb` : "Rp0",
+                label: "Omset Aktif",
+                value: formatRp(pendapatanHariIni),
                 color: "border-l-[#C9A227]",
-                bg: "bg-[#FDF6E3]",
+                bg: "bg-[#FDF9EE]",
               },
-            ].map(s => (
+            ].map((s) => (
               <div key={s.label} className={`${s.bg} border border-black/5 border-l-4 ${s.color} rounded-[14px] px-4 py-3`}>
-                <p className="text-[10px] text-[#7C7770] font-medium">{s.label}</p>
-                <p className="text-[20px] font-bold text-[#1A1714] font-display mt-0.5">{s.value}</p>
+                <p className="text-[11px] text-[#7C7770] font-medium">{s.label}</p>
+                <p className="text-[18px] font-bold text-[#1A1714] mt-0.5">{s.value}</p>
               </div>
             ))}
           </div>
 
-          {/* Tab filter */}
-          <div className="flex gap-2">
-            {tabFilters.map(t => (
+          {/* Filter Tabs */}
+          <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
+            {tabFilters.map((tab) => (
               <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-[10px] text-[12px] font-medium border transition-all ${
-                  activeTab === t.id
+                  activeTab === tab.id
                     ? "bg-[#C9A227] text-white border-[#C9A227]"
                     : "bg-white border-[#E8E6E1] text-[#7C7770] hover:border-[#C9A227]"
                 }`}
               >
-                {t.dot && <span className={`w-2 h-2 rounded-full ${activeTab === t.id ? "bg-white" : t.dot}`} />}
-                {t.label}
-                <span className={`ml-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === t.id ? "bg-white/20 text-white" : "bg-[#F0EEE9] text-[#7C7770]"}`}>{t.count}</span>
+                {tab.dot && <span className={`w-2 h-2 rounded-full ${tab.dot}`} />}
+                <span>{tab.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  activeTab === tab.id ? "bg-white/20 text-white" : "bg-[#F0EEE9] text-[#7C7770]"
+                }`}>
+                  {tab.count}
+                </span>
               </button>
             ))}
           </div>
 
           {/* Order cards */}
           <div className="space-y-3">
-            {filtered.map(order => (
-              <div key={order.id} className="bg-white rounded-[18px] border border-[#E8E6E1] p-5 hover:border-[#C9A227] hover:shadow-[0_4px_16px_rgba(201,162,39,0.08)] transition-all"
-                style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+            {filtered.map((order) => (
+              <div key={order.id} className="bg-white rounded-[18px] border border-[#E8E6E1] p-5 hover:border-[#C9A227] hover:shadow-[0_4px_16px_rgba(201,162,39,0.08)] transition-all">
                 <div className="flex items-start gap-4">
                   <img
                     src={order.items[0]?.image || "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=80&h=80&fit=crop&auto=format"}
@@ -163,10 +180,10 @@ export default function UMKMTransactionsPage() {
                     className="w-16 h-16 rounded-[14px] object-cover shrink-0 border border-[#E8E6E1]"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[11px] text-[#ABA9A4] font-mono">{order.id}</p>
-                        <p className="text-[14px] font-semibold text-[#1A1714] mt-0.5">
+                        <p className="text-[14px] font-bold text-[#1A1714] mt-0.5">
                           {order.items[0]?.name || "Produk"}
                           {order.items.length > 1 && (
                             <span className="text-[#ABA9A4] font-normal text-[12px]"> +{order.items.length - 1} produk lain</span>
@@ -174,9 +191,9 @@ export default function UMKMTransactionsPage() {
                           <span className="text-[#ABA9A4] font-normal"> ×{order.items[0]?.qty || 1}</span>
                         </p>
                         <p className="text-[12px] text-[#7C7770] mt-0.5">Pelanggan: <span className="font-semibold text-[#1A1714]">{order.customer}</span></p>
-                        <p className="text-[11px] text-[#ABA9A4] mt-0.5">{order.date} · {order.time}</p>
+                        <p className="text-[11px] text-[#ABA9A4] mt-0.5">{order.date} · {order.time} · <span className="text-[#C9A227] font-medium">{order.umkm}</span></p>
                       </div>
-                      <div className="flex gap-1.5 shrink-0">
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <StatusBadge status={order.payStatus} type="payment" />
                         <StatusBadge status={order.orderStatus} type="order" />
                       </div>
@@ -210,6 +227,17 @@ export default function UMKMTransactionsPage() {
                             {updating === order.id ? "Mengirim..." : "Kirim Sekarang"}
                           </Button>
                         )}
+                        {order.orderStatus === "DIKIRIM" && (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            onClick={() => handleSelesai(order.id)}
+                            disabled={updating === order.id}
+                          >
+                            {updating === order.id ? "Memproses..." : "Selesaikan Pesanan"}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -222,7 +250,7 @@ export default function UMKMTransactionsPage() {
                 <p className="text-[14px] font-semibold text-[#1A1714]">Tidak ada pesanan aktif</p>
                 <p className="text-[12px] text-[#ABA9A4] mt-1">
                   {activeTab === "all"
-                    ? "Belum ada pesanan masuk. Pesanan baru dari customer akan muncul di sini."
+                    ? "Belum ada pesanan aktif masuk. Pesanan yang telah selesai dapat dilihat di menu Riwayat."
                     : "Belum ada pesanan dengan status ini"}
                 </p>
               </div>

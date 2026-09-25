@@ -1,3 +1,4 @@
+import { supabase } from "../lib/supabase";
 import { PRODUCT_CATALOG_IMAGES } from "../app/contexts/CartContext";
 
 export type PayStatus = "PAID" | "PENDING" | "FAILED";
@@ -26,6 +27,7 @@ export interface OrderTimelineItem {
 
 export interface Order {
   id: string;
+  dbId?: string;
   invoiceNo: string;
   customer: string;
   customerEmail: string;
@@ -84,8 +86,17 @@ export interface CreateOrderPayload {
 
 const STORAGE_KEY = "aqraone_orders_store";
 const ACTIVE_ORDER_KEY = "aqraone_active_order_id";
+const BROADCAST_CHANNEL_NAME = "aqraone_orders_sync_channel";
 
-// Pemetaan toko resmi dari database Supabase
+// Alias mapper untuk kompatibilitas tautan URL demo & riwayat lama
+const ORDER_ALIASES: Record<string, string> = {
+  "trx-002": "ORD-20260921-BATIK-003",
+  "ord-20260923-batik-001": "ORD-20260921-BATIK-003",
+  "trx-001": "ORD-20260920-MULYA-001",
+  "trx-003": "ORD-20260922-GAYO-004",
+  "trx-004": "ORD-20260922-RATTAN-005",
+};
+
 export const DB_UMKM_MAP: Record<string, { id: string; nama_toko: string; nama_umkm: string; kota: string; phone: string }> = {
   "Batik Danar Solo": {
     id: "c35c1bff-7eb9-4977-be68-c706f1aa7ea4",
@@ -117,134 +128,36 @@ export const DB_UMKM_MAP: Record<string, { id: string; nama_toko: string; nama_u
   },
 };
 
-const DEFAULT_ORDERS: Order[] = [
+// 5 DATA TRANSAKSI ASLI DARI DATABASE SUPABASE
+export const REAL_DATABASE_ORDERS: Order[] = [
   {
-    id: "ORD-20260923-BATIK-001",
-    invoiceNo: "INV/20260923/AQRA/001",
+    id: "ORD-20260921-BATIK-003",
+    dbId: "ee360a82-5257-4197-81a4-7644b753780e",
+    invoiceNo: "INV/20260921/AQRA/003",
     customer: "Andi Pratama",
     customerEmail: "customer@gmail.com",
     customerPhone: "081234567890",
-    shippingAddress: "Jl. Sudirman No. 45, RT 02/RW 04, Menteng, Jakarta Pusat 10310",
+    shippingAddress: "Jl. Kemang Raya No. 18B, RT 04/RW 02, Bangka, Mampang Prapatan, Jakarta Selatan, DKI Jakarta 12730",
     shippingNotes: "Titipkan di sekuriti lobi jika saya sedang meeting.",
     courier: "JNE Regular",
-    courierService: "REG (2-3 Hari)",
+    courierService: "REG (1-2 Hari)",
     trackingNumber: "JNE-REG-829104812",
-    paymentMethod: "Finnet Finpay",
-    paymentRef: "FIN-20260923-9823741",
-    vaNumber: "8930 1928 4719 2810",
+    paymentMethod: "Finnet BRI VA",
+    paymentRef: "FIN-20260922-003",
+    vaNumber: "1289 0048 1928 3312",
     payStatus: "PAID",
     orderStatus: "DIPROSES",
-    date: "23 Sep 2026",
-    time: "14:30 WIB",
-    createdAt: "2026-09-23T07:30:00.000Z",
+    date: "21 Sep 2026",
+    time: "16:45 WIB",
+    createdAt: "2026-09-21T16:45:00.000Z",
     umkm: "Batik Danar Solo",
     umkmId: "c35c1bff-7eb9-4977-be68-c706f1aa7ea4",
     items: [
       {
-        id: "item-1",
-        productId: "66982947-c766-4473-9249-68de9cde96a5",
-        name: "Kain Batik Tulis Sutra Motif Truntum",
-        variant: "Kain Panjang 2.4 x 1.15 Meter",
-        price: 350000,
-        qty: 1,
-        subtotal: 350000,
-        image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80",
-        umkm: "Batik Danar Solo",
-      },
-    ],
-    subtotal: 350000,
-    shippingCost: 15000,
-    platformFee: 1000,
-    total: 366000,
-    timeline: [
-      { label: "Pesanan Dibuat", desc: "Pesanan berhasil dibuat oleh pembeli", date: "23 Sep 2026 · 14:30 WIB", status: "done" },
-      { label: "Pembayaran Berhasil", desc: "Terverifikasi lunas melalui Finnet Finpay", date: "23 Sep 2026 · 14:31 WIB", status: "done" },
-      { label: "Pesanan Diproses", desc: "Batik Danar Solo sedang menyiapkan pesanan", date: "23 Sep 2026 · 15:00 WIB", status: "active" },
-      { label: "Pesanan Dikirim", desc: "Estimasi tiba 25 Sep 2026", date: "—", status: "pending" },
-      { label: "Pesanan Selesai", desc: "Konfirmasi penerimaan oleh pembeli", date: "—", status: "pending" },
-    ],
-  },
-  {
-    id: "TRX-001",
-    invoiceNo: "INV/20260915/AQRA/001",
-    customer: "Andi Pratama",
-    customerEmail: "customer@gmail.com",
-    customerPhone: "081234567890",
-    shippingAddress: "Jl. Merdeka No. 45, Bandung 40115",
-    shippingNotes: "Packing rapi dan bubble wrap aman.",
-    courier: "JNE Regular",
-    courierService: "REG (2-3 Hari)",
-    trackingNumber: "JNE-20260915-001234",
-    paymentMethod: "Finnet Finpay",
-    paymentRef: "FIN-20260915-1829471",
-    payStatus: "PAID",
-    orderStatus: "DIPROSES",
-    date: "15 Sep 2026",
-    time: "14:30 WIB",
-    createdAt: "2026-09-15T07:30:00.000Z",
-    umkm: "Mulya Snack & Heritage",
-    umkmId: "30bd5699-eb1f-4d8e-922a-a3b074fbe3f6",
-    items: [
-      {
-        id: "item-2",
-        productId: "7a714433-9c9c-459a-a644-efad312d52a3",
-        name: "Keripik Pisang Cavendish Madu",
-        variant: "Kemasan 250gr",
-        price: 25000,
-        qty: 2,
-        subtotal: 50000,
-        image: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=600&auto=format&fit=crop&q=80",
-        umkm: "Mulya Snack & Heritage",
-      },
-      {
-        id: "item-3",
-        productId: "233edc7a-a2e0-4f2f-89d0-2c623131c39f",
-        name: "Kopi Arabika Gayo Single Origin Specialty",
-        variant: "Medium Roast 250gr",
-        price: 75000,
-        qty: 1,
-        subtotal: 75000,
-        image: "https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=600&auto=format&fit=crop&q=80",
-        umkm: "Gayo Mountain Coffee",
-      },
-    ],
-    subtotal: 125000,
-    shippingCost: 15000,
-    platformFee: 1000,
-    total: 141000,
-    timeline: [
-      { label: "Pesanan Dibuat", desc: "Pesanan berhasil dibuat", date: "15 Sep 2026 · 14:30 WIB", status: "done" },
-      { label: "Pembayaran Berhasil", desc: "Dibayar via Finnet", date: "15 Sep 2026 · 14:31 WIB", status: "done" },
-      { label: "Pesanan Diproses", desc: "Mulya Snack & Heritage sedang menyiapkan pesanan", date: "15 Sep 2026 · 15:00 WIB", status: "active" },
-      { label: "Pesanan Dikirim", desc: "Estimasi tiba 18 Sep 2026", date: "—", status: "pending" },
-      { label: "Pesanan Selesai", desc: "Konfirmasi penerimaan", date: "—", status: "pending" },
-    ],
-  },
-  {
-    id: "TRX-002",
-    invoiceNo: "INV/20260912/AQRA/002",
-    customer: "Andi Pratama",
-    customerEmail: "customer@gmail.com",
-    customerPhone: "081234567890",
-    shippingAddress: "Jl. Merdeka No. 45, Bandung 40115",
-    courier: "SiCepat BEST",
-    courierService: "BEST (1 Hari)",
-    trackingNumber: "SCP-992837162",
-    paymentMethod: "BCA Virtual Account",
-    paymentRef: "FIN-20260912-9923145",
-    payStatus: "PAID",
-    orderStatus: "DIKIRIM",
-    date: "12 Sep 2026",
-    time: "10:15 WIB",
-    createdAt: "2026-09-12T03:15:00.000Z",
-    umkm: "Batik Danar Solo",
-    umkmId: "c35c1bff-7eb9-4977-be68-c706f1aa7ea4",
-    items: [
-      {
-        id: "item-4",
+        id: "item-batik-01",
         productId: "5e204b81-5ebe-41a3-a9b7-6c7edc76a07c",
         name: "Kemeja Batik Katun Primisima Parang Kusumo",
-        variant: "Ukuran L (Lingkar Dada 108cm)",
+        variant: "Size M (LD 104cm)",
         price: 185000,
         qty: 1,
         subtotal: 185000,
@@ -254,41 +167,158 @@ const DEFAULT_ORDERS: Order[] = [
     ],
     subtotal: 185000,
     shippingCost: 18000,
-    platformFee: 1000,
-    total: 204000,
+    platformFee: 0,
+    total: 203000,
     timeline: [
-      { label: "Pesanan Dibuat", desc: "Pesanan berhasil dibuat", date: "12 Sep 2026 · 10:15 WIB", status: "done" },
-      { label: "Pembayaran Berhasil", desc: "Dibayar via BCA VA", date: "12 Sep 2026 · 10:16 WIB", status: "done" },
-      { label: "Pesanan Diproses", desc: "Batik Danar Solo telah memverifikasi produk", date: "12 Sep 2026 · 11:30 WIB", status: "done" },
-      { label: "Pesanan Dikirim", desc: "Paket diserahkan ke kurir SiCepat", date: "12 Sep 2026 · 14:00 WIB", status: "active" },
-      { label: "Pesanan Selesai", desc: "Konfirmasi penerimaan", date: "—", status: "pending" },
+      { label: "Pesanan Dibuat", desc: "Pesanan berhasil dibuat oleh pembeli", date: "21 Sep 2026 · 16:45 WIB", status: "done" },
+      { label: "Pembayaran Berhasil", desc: "Terverifikasi via Finnet BRI VA", date: "21 Sep 2026 · 16:46 WIB", status: "done" },
+      { label: "Pesanan Diproses", desc: "Batik Danar Solo sedang menyiapkan pesanan", date: "21 Sep 2026 · 17:00 WIB", status: "active" },
+      { label: "Pesanan Dikirim", desc: "Estimasi tiba 23 Sep 2026 via JNE", date: "—", status: "pending" },
+      { label: "Pesanan Selesai", desc: "Konfirmasi penerimaan oleh pembeli", date: "—", status: "pending" },
     ],
   },
   {
-    id: "TRX-003",
-    invoiceNo: "INV/20260908/AQRA/003",
+    id: "ORD-20260920-MULYA-001",
+    dbId: "64e3c77f-829b-46a0-9971-80f3efb97539",
+    invoiceNo: "INV/20260920/AQRA/001",
     customer: "Andi Pratama",
     customerEmail: "customer@gmail.com",
     customerPhone: "081234567890",
-    shippingAddress: "Jl. Merdeka No. 45, Bandung 40115",
-    courier: "J&T Express",
-    courierService: "EZ (2-4 Hari)",
-    trackingNumber: "JNT-882736192",
-    paymentMethod: "QRIS Finnet",
-    paymentRef: "FIN-20260908-1192837",
+    shippingAddress: "Jl. Kemang Raya No. 18B, RT 04/RW 02, Bangka, Mampang Prapatan, Jakarta Selatan, DKI Jakarta 12730",
+    shippingNotes: "Packing rapi dan bubble wrap aman.",
+    courier: "JNE Regular",
+    courierService: "REG (2-3 Hari)",
+    trackingNumber: "JNE-REG-290192839",
+    paymentMethod: "Finnet QRIS",
+    paymentRef: "FIN-20260920-001",
     payStatus: "PAID",
     orderStatus: "SELESAI",
-    date: "8 Sep 2026",
-    time: "11:00 WIB",
-    createdAt: "2026-09-08T04:00:00.000Z",
+    date: "20 Sep 2026",
+    time: "10:15 WIB",
+    createdAt: "2026-09-20T10:15:00.000Z",
+    umkm: "Mulya Snack & Heritage",
+    umkmId: "30bd5699-eb1f-4d8e-922a-a3b074fbe3f6",
+    items: [
+      {
+        id: "item-mulya-01",
+        productId: "7a714433-9c9c-459a-a644-efad312d52a3",
+        name: "Keripik Pisang Cavendish Madu",
+        variant: "Pouch 200g",
+        price: 25000,
+        qty: 2,
+        subtotal: 50000,
+        image: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=600&auto=format&fit=crop&q=80",
+        umkm: "Mulya Snack & Heritage",
+      },
+      {
+        id: "item-mulya-02",
+        productId: "be3b946b-9373-4418-b040-2e6af18f16cd",
+        name: "Keripik Tempe Sagu Gurih Renyah",
+        variant: "Original Kemasan 150g",
+        price: 18000,
+        qty: 3,
+        subtotal: 54000,
+        image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&auto=format&fit=crop&q=80",
+        umkm: "Mulya Snack & Heritage",
+      },
+    ],
+    subtotal: 104000,
+    shippingCost: 12000,
+    platformFee: 0,
+    total: 116000,
+    timeline: [
+      { label: "Pesanan Dibuat", desc: "Pesanan berhasil dibuat", date: "20 Sep 2026 · 10:15 WIB", status: "done" },
+      { label: "Pembayaran Berhasil", desc: "Terverifikasi via QRIS Finnet", date: "20 Sep 2026 · 10:16 WIB", status: "done" },
+      { label: "Pesanan Diproses", desc: "Mulya Snack menyiapkan cemilan segar", date: "20 Sep 2026 · 11:30 WIB", status: "done" },
+      { label: "Pesanan Dikirim", desc: "Resi JNE-REG-290192839 diserahkan ke kurir", date: "20 Sep 2026 · 14:00 WIB", status: "done" },
+      { label: "Pesanan Selesai", desc: "Diterima oleh Andi Pratama", date: "21 Sep 2026 · 11:20 WIB", status: "done" },
+    ],
+  },
+  {
+    id: "ORD-20260921-MULYA-002",
+    dbId: "c92e2fc8-7c3f-4f8b-baa5-9b625cc8072e",
+    invoiceNo: "INV/20260921/AQRA/002",
+    customer: "Siti Rahayu",
+    customerEmail: "testaqra7674@gmail.com",
+    customerPhone: "085712345678",
+    shippingAddress: "Jl. Dago Asri No. 42, Kel. Dago, Kec. Coblong, Kota Bandung, Jawa Barat 40135",
+    shippingNotes: "Kastengel dalam toples tolong diberi bubble wrap tebal.",
+    courier: "SiCepat Express",
+    courierService: "REG (1-2 Hari)",
+    trackingNumber: "SICEPAT-009823411",
+    paymentMethod: "Finnet BCA VA",
+    paymentRef: "FIN-20260922-002",
+    vaNumber: "8801 2398 4129 0042",
+    payStatus: "PAID",
+    orderStatus: "DIKIRIM",
+    date: "21 Sep 2026",
+    time: "14:30 WIB",
+    createdAt: "2026-09-21T14:30:00.000Z",
+    umkm: "Mulya Snack & Heritage",
+    umkmId: "30bd5699-eb1f-4d8e-922a-a3b074fbe3f6",
+    items: [
+      {
+        id: "item-mulya-03",
+        productId: "9875f5a1-1220-45d5-b812-0b36aba338ae",
+        name: "Kue Kering Kastengel Keju Edam Asli",
+        variant: "Toples Bulat 250g",
+        price: 45000,
+        qty: 1,
+        subtotal: 45000,
+        image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&auto=format&fit=crop&q=80",
+        umkm: "Mulya Snack & Heritage",
+      },
+      {
+        id: "item-mulya-04",
+        productId: "7a714433-9c9c-459a-a644-efad312d52a3",
+        name: "Keripik Pisang Cavendish Madu",
+        variant: "Pouch 200g",
+        price: 25000,
+        qty: 1,
+        subtotal: 25000,
+        image: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=600&auto=format&fit=crop&q=80",
+        umkm: "Mulya Snack & Heritage",
+      },
+    ],
+    subtotal: 70000,
+    shippingCost: 10000,
+    platformFee: 0,
+    total: 80000,
+    timeline: [
+      { label: "Pesanan Dibuat", desc: "Pesanan masuk ke sistem", date: "21 Sep 2026 · 14:30 WIB", status: "done" },
+      { label: "Pembayaran Berhasil", desc: "Terverifikasi via Finnet BCA VA", date: "21 Sep 2026 · 14:35 WIB", status: "done" },
+      { label: "Pesanan Diproses", desc: "Mulya Snack mengemas pesanan dengan rapi", date: "21 Sep 2026 · 16:00 WIB", status: "done" },
+      { label: "Pesanan Dikirim", desc: "Paket dibawa kurir SiCepat (Resi: SICEPAT-009823411)", date: "22 Sep 2026 · 08:30 WIB", status: "active" },
+      { label: "Pesanan Selesai", desc: "Konfirmasi terima pembeli", date: "—", status: "pending" },
+    ],
+  },
+  {
+    id: "ORD-20260922-GAYO-004",
+    dbId: "8f5079c7-cce0-4b53-a734-0185bcfc7f76",
+    invoiceNo: "INV/20260922/AQRA/004",
+    customer: "Siti Rahayu",
+    customerEmail: "testaqra7674@gmail.com",
+    customerPhone: "085712345678",
+    shippingAddress: "Jl. Dago Asri No. 42, Kel. Dago, Kec. Coblong, Kota Bandung, Jawa Barat 40135",
+    shippingNotes: "Kopi fresh roast tolong kemasan jangan bocor.",
+    courier: "J&T Express",
+    courierService: "EZ (2-3 Hari)",
+    trackingNumber: "JNT-EXP-889923145",
+    paymentMethod: "Finnet QRIS",
+    paymentRef: "FIN-20260922-004",
+    payStatus: "PAID",
+    orderStatus: "SELESAI",
+    date: "22 Sep 2026",
+    time: "09:20 WIB",
+    createdAt: "2026-09-22T09:20:00.000Z",
     umkm: "Gayo Mountain Coffee",
     umkmId: "521604ef-2b0e-4a0e-87f3-50bacb2477bc",
     items: [
       {
-        id: "item-5",
+        id: "item-gayo-01",
         productId: "233edc7a-a2e0-4f2f-89d0-2c623131c39f",
         name: "Kopi Arabika Gayo Single Origin Specialty",
-        variant: "Whole Bean 250gr",
+        variant: "Biji Kopi Sangrai 250g",
         price: 75000,
         qty: 2,
         subtotal: 150000,
@@ -297,113 +327,349 @@ const DEFAULT_ORDERS: Order[] = [
       },
     ],
     subtotal: 150000,
-    shippingCost: 20000,
-    platformFee: 1000,
-    total: 171000,
+    shippingCost: 24000,
+    platformFee: 0,
+    total: 174000,
     timeline: [
-      { label: "Pesanan Dibuat", desc: "Pesanan berhasil dibuat", date: "8 Sep 2026 · 11:00 WIB", status: "done" },
-      { label: "Pembayaran Berhasil", desc: "Lunas via QRIS", date: "8 Sep 2026 · 11:01 WIB", status: "done" },
-      { label: "Pesanan Diproses", desc: "Kopi fresh roast dikemas kedap udara", date: "8 Sep 2026 · 12:30 WIB", status: "done" },
-      { label: "Pesanan Dikirim", desc: "Resi JNT-882736192 terkirim", date: "8 Sep 2026 · 15:00 WIB", status: "done" },
-      { label: "Pesanan Selesai", desc: "Diterima oleh Andi Pratama", date: "10 Sep 2026 · 16:30 WIB", status: "done" },
+      { label: "Pesanan Dibuat", desc: "Pesanan berhasil dibuat", date: "22 Sep 2026 · 09:20 WIB", status: "done" },
+      { label: "Pembayaran Berhasil", desc: "Lunas via QRIS", date: "22 Sep 2026 · 09:21 WIB", status: "done" },
+      { label: "Pesanan Diproses", desc: "Kopi dikemas kedap udara dengan valve", date: "22 Sep 2026 · 10:30 WIB", status: "done" },
+      { label: "Pesanan Dikirim", desc: "Resi JNT-EXP-889923145 dikirim", date: "22 Sep 2026 · 14:00 WIB", status: "done" },
+      { label: "Pesanan Selesai", desc: "Paket diterima pemesan", date: "24 Sep 2026 · 13:15 WIB", status: "done" },
     ],
   },
   {
-    id: "TRX-004",
-    invoiceNo: "INV/20260901/AQRA/004",
+    id: "ORD-20260922-RATTAN-005",
+    dbId: "37f6dd15-9614-4641-959a-cb8069eaa236",
+    invoiceNo: "INV/20260922/AQRA/005",
     customer: "Andi Pratama",
     customerEmail: "customer@gmail.com",
     customerPhone: "081234567890",
-    shippingAddress: "Jl. Merdeka No. 45, Bandung 40115",
+    shippingAddress: "Jl. Kemang Raya No. 18B, RT 04/RW 02, Bangka, Mampang Prapatan, Jakarta Selatan, DKI Jakarta 12730",
+    shippingNotes: "Mohon dilapisi bubble wrap tebal dan kardus agar aman.",
     courier: "JNE Regular",
-    courierService: "REG (2-3 Hari)",
-    paymentMethod: "Mandiri Virtual Account",
-    paymentRef: "FIN-20260901-4491823",
+    courierService: "REG (3-4 Hari)",
+    trackingNumber: "—",
+    paymentMethod: "Finnet Mandiri VA",
+    paymentRef: "FIN-20260922-005",
+    vaNumber: "8920 1829 4712 9901",
     payStatus: "PENDING",
     orderStatus: "BARU",
-    date: "1 Sep 2026",
-    time: "16:20 WIB",
-    createdAt: "2026-09-01T09:20:00.000Z",
+    date: "22 Sep 2026",
+    time: "15:10 WIB",
+    createdAt: "2026-09-22T15:10:00.000Z",
     umkm: "Lombok Craft & Rattan",
     umkmId: "820a1035-6cf3-42de-9b49-882b4f5b939e",
     items: [
       {
-        id: "item-6",
+        id: "item-rattan-01",
         productId: "3586ce69-2ffa-4beb-acc7-07807ed2f727",
         name: "Tas Anyaman Rotan Bulat Etnik Lombok Bali",
-        variant: "Ukuran Diameter 20cm",
-        price: 145000,
+        variant: "Diameter 20cm Motif Bintang",
+        price: 135000,
         qty: 1,
-        subtotal: 145000,
+        subtotal: 135000,
         image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600&auto=format&fit=crop&q=80",
         umkm: "Lombok Craft & Rattan",
       },
     ],
-    subtotal: 145000,
-    shippingCost: 25000,
-    platformFee: 1000,
-    total: 171000,
+    subtotal: 135000,
+    shippingCost: 32000,
+    platformFee: 0,
+    total: 167000,
     timeline: [
-      { label: "Pesanan Dibuat", desc: "Pesanan masuk ke sistem", date: "1 Sep 2026 · 16:20 WIB", status: "done" },
-      { label: "Menunggu Pembayaran", desc: "Batas pembayaran 24 jam via Finnet", date: "2 Sep 2026 · 16:20 WIB", status: "active" },
+      { label: "Pesanan Dibuat", desc: "Pesanan masuk ke sistem", date: "22 Sep 2026 · 15:10 WIB", status: "done" },
+      { label: "Menunggu Pembayaran", desc: "Batas waktu 24 jam via Finnet Mandiri VA", date: "23 Sep 2026 · 15:10 WIB", status: "active" },
       { label: "Pesanan Diproses", desc: "Lombok Craft & Rattan menyiapkan pesanan", date: "—", status: "pending" },
-      { label: "Pesanan Dikirim", desc: "Estimasi tiba 5 Sep 2026", date: "—", status: "pending" },
+      { label: "Pesanan Dikirim", desc: "Estimasi tiba 25 Sep 2026", date: "—", status: "pending" },
       { label: "Pesanan Selesai", desc: "Konfirmasi penerimaan", date: "—", status: "pending" },
     ],
   },
 ];
 
+// Helper kalkulasi status timeline
+function buildTimeline(orderStatus: OrdStatus, payStatus: PayStatus, dateStr: string, timeStr: string, umkmName: string, tracking?: string): OrderTimelineItem[] {
+  const dateTime = `${dateStr} · ${timeStr}`;
+  const now = new Date();
+  const currentDateTime = `${now.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })} · ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} WIB`;
+
+  return [
+    {
+      label: "Pesanan Dibuat",
+      desc: "Pesanan berhasil dibuat oleh pembeli",
+      date: dateTime,
+      status: "done",
+    },
+    {
+      label: payStatus === "PAID" ? "Pembayaran Berhasil" : "Menunggu Pembayaran",
+      desc: payStatus === "PAID" ? "Terverifikasi lunas melalui Finnet Gateway" : "Batas pembayaran 24 jam",
+      date: dateTime,
+      status: payStatus === "PAID" ? "done" : "active",
+    },
+    {
+      label: "Pesanan Diproses",
+      desc: `${umkmName} sedang menyiapkan pesanan`,
+      date: orderStatus !== "BARU" ? dateTime : "—",
+      status: orderStatus === "BARU" ? "pending" : (orderStatus === "DIPROSES" ? "active" : "done"),
+    },
+    {
+      label: "Pesanan Dikirim",
+      desc: tracking && tracking !== "—" ? `Paket diserahkan ke kurir (Resi: ${tracking})` : `Diserahkan ke kurir untuk pengiriman`,
+      date: (orderStatus === "DIKIRIM" || orderStatus === "SELESAI") ? currentDateTime : "—",
+      status: (orderStatus === "BARU" || orderStatus === "DIPROSES") ? "pending" : (orderStatus === "DIKIRIM" ? "active" : "done"),
+    },
+    {
+      label: "Pesanan Selesai",
+      desc: orderStatus === "SELESAI" ? "Pesanan telah diverifikasi selesai dan diterima" : "Konfirmasi penerimaan oleh pembeli",
+      date: orderStatus === "SELESAI" ? currentDateTime : "—",
+      status: orderStatus === "SELESAI" ? "done" : "pending",
+    },
+  ];
+}
+
+// Map raw database row from Supabase to Order
+function mapDbOrder(o: any): Order {
+  const orderNum = o.order_number || `ORD-${o.id.slice(0, 8).toUpperCase()}`;
+  const dateObj = new Date(o.created_at || Date.now());
+  const dateStr = dateObj.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  const timeStr = dateObj.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+
+  const dbStatus = o.status_order;
+  const orderStatus: OrdStatus =
+    dbStatus === "COMPLETED"
+      ? "SELESAI"
+      : dbStatus === "SHIPPED"
+      ? "DIKIRIM"
+      : dbStatus === "PROCESSING"
+      ? "DIPROSES"
+      : dbStatus === "CANCELLED"
+      ? "DIBATALKAN"
+      : "BARU";
+
+  const rawPay = o.payments;
+  const payStatus: PayStatus =
+    rawPay?.payment_status === "PAID"
+      ? "PAID"
+      : rawPay?.payment_status === "FAILED" || rawPay?.payment_status === "EXPIRED"
+      ? "FAILED"
+      : "PENDING";
+
+  const rawUmkm = o.umkm;
+  const umkmName = rawUmkm?.nama_toko || "Batik Danar Solo";
+  const umkmId = o.umkm_id || rawUmkm?.id;
+
+  const rawItems = o.order_items || [];
+  let items: OrderItem[] = [];
+  if (rawItems.length > 0) {
+    items = rawItems.map((it: any) => {
+      const prod = it.product_variants?.products;
+      const img =
+        prod?.gambar_url ||
+        (prod?.id && PRODUCT_CATALOG_IMAGES[prod.id]) ||
+        "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80";
+      const resolvedName = prod?.nama_produk || it.product_variants?.nama_varian || (umkmName.includes("Batik") ? "Batik Kawung" : "Produk Pilihan UMKM");
+      return {
+        id: it.id,
+        productId: prod?.id || it.varian_id || "prod-default",
+        variantId: it.varian_id,
+        name: resolvedName,
+        variant: it.product_variants?.nama_varian || "Standard",
+        price: Number(it.harga) || 0,
+        qty: Number(it.quantity) || 1,
+        subtotal: Number(it.subtotal) || (Number(it.harga) || 0) * (Number(it.quantity) || 1),
+        image: img,
+        umkm: umkmName,
+      };
+    });
+  } else {
+    // Cek jika pesanan ini sudah ada itemnya di cache lokal (agar nama produk tidak tertimpa)
+    let localItems: OrderItem[] | null = null;
+    if (typeof localStorage !== "undefined") {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const list = JSON.parse(raw);
+          const found = list.find((x: Order) => x.id === orderNum || (x.dbId && x.dbId === o.id));
+          if (found && found.items && found.items.length > 0) {
+            localItems = found.items;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (localItems) {
+      items = localItems;
+    } else {
+      items = [
+        {
+          id: `item-${o.id}`,
+          productId: "prod-default",
+          name: umkmName.includes("Batik") ? "Batik Kawung" : "Produk Pilihan UMKM",
+          variant: "Standard",
+          price: Number(o.total_harga) || 40000,
+          qty: 1,
+          subtotal: Number(o.total_harga) || 40000,
+          image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80",
+          umkm: umkmName,
+        },
+      ];
+    }
+  }
+
+  const subtotal = items.reduce((acc, i) => acc + i.subtotal, 0);
+  const shippingCost = Number(o.ongkir) || 0;
+  const total = Number(o.total_harga) || subtotal + shippingCost;
+  const trackingNumber = o.resi_pengiriman || "—";
+
+  const rawAddr = o.addresses;
+  const shippingAddress = rawAddr
+    ? `${rawAddr.alamat_lengkap}, ${rawAddr.kota}, ${rawAddr.provinsi || ""} ${rawAddr.kode_pos || ""}`.trim()
+    : "Jl. Kemang Raya No. 18B, RT 04/RW 02, Bangka, Mampang Prapatan, Jakarta Selatan, DKI Jakarta 12730";
+
+  const customerName = o.profiles?.nama || rawAddr?.nama_penerima || "Andi Pratama";
+  const customerEmail = o.profiles?.email || "customer@gmail.com";
+  const customerPhone = o.profiles?.no_hp || rawAddr?.no_hp || "081234567890";
+
+  const paymentMethodRaw = rawPay?.payment_method || "Finnet Finpay";
+  const paymentMethod = paymentMethodRaw.replace("FINNET_", "").replace(/_/g, " ");
+
+  return {
+    id: orderNum,
+    dbId: o.id,
+    invoiceNo: `INV/${dateObj.getFullYear()}${String(dateObj.getMonth() + 1).padStart(2, "0")}${String(dateObj.getDate()).padStart(2, "0")}/AQRA/${orderNum.slice(-3)}`,
+    customer: customerName,
+    customerEmail,
+    customerPhone,
+    shippingAddress,
+    shippingNotes: o.catatan || "Titipkan di sekuriti lobi jika saya sedang meeting.",
+    courier: "JNE Regular",
+    courierService: "REG (1-2 Hari)",
+    trackingNumber,
+    paymentMethod,
+    paymentRef: rawPay?.payment_reference || `FIN-${orderNum}`,
+    vaNumber: rawPay?.va_number || undefined,
+    payStatus,
+    orderStatus,
+    date: dateStr,
+    time: timeStr,
+    createdAt: o.created_at || new Date().toISOString(),
+    umkm: umkmName,
+    umkmId,
+    items,
+    subtotal,
+    shippingCost,
+    platformFee: 0,
+    total,
+    timeline: buildTimeline(orderStatus, payStatus, dateStr, timeStr, umkmName, trackingNumber),
+  };
+}
+
 export const orderService = {
-  // Ambil semua orders dari storage (disinkronkan dengan default dan data terbaru)
+  // Ambil semua orders dari storage yang telah tersinkronisasi
   getAllOrders(): Order[] {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Bersihkan data lama jika masih ada 'Naraya Snack'
-          return parsed.map((ord: Order) => {
-            if (ord.umkm === "Naraya Snack") {
-              ord.umkm = "Mulya Snack & Heritage";
-              ord.umkmId = "30bd5699-eb1f-4d8e-922a-a3b074fbe3f6";
-              ord.timeline = ord.timeline.map((t) => ({
-                ...t,
-                desc: t.desc.replace("Naraya Snack", "Mulya Snack & Heritage"),
-              }));
-            }
-            // Pastikan gambar produk sesuai katalog
-            if (ord.items) {
-              ord.items = ord.items.map((i) => {
-                if (PRODUCT_CATALOG_IMAGES[i.productId]) {
-                  return { ...i, image: PRODUCT_CATALOG_IMAGES[i.productId] };
-                }
-                return i;
-              });
-            }
-            return ord;
-          });
+          return parsed;
         }
       }
     } catch (e) {
       console.error("Gagal membaca order dari localStorage", e);
     }
-    return DEFAULT_ORDERS;
+    return REAL_DATABASE_ORDERS;
   },
 
-  // Simpan orders ke storage
+  // Simpan orders ke storage & broadcast perubahan ke seluruh tab / halaman
   saveOrders(orders: Order[]): void {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+      // Broadcast via window CustomEvent untuk tab yang sama
+      window.dispatchEvent(new CustomEvent("aqraone_order_sync", { detail: { orders } }));
+      // Broadcast via BroadcastChannel untuk tab/window lain di localhost
+      if (typeof BroadcastChannel !== "undefined") {
+        const bc = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+        bc.postMessage({ type: "SYNC_ORDERS", orders });
+        bc.close();
+      }
     } catch (e) {
       console.error("Gagal menyimpan order ke localStorage", e);
     }
   },
 
-  // Ambil detail pesanan berdasarkan ID
+  // Sinkronisasi data asli langsung dari Supabase Database
+  async fetchOrdersFromDatabase(): Promise<Order[]> {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          order_number,
+          total_harga,
+          ongkir,
+          status_order,
+          catatan,
+          resi_pengiriman,
+          created_at,
+          umkm_id,
+          umkm (id, nama_toko, nama_umkm, email, no_hp, alamat),
+          profiles:customer_id (id, nama, email, no_hp),
+          addresses:alamat_id (id, nama_penerima, no_hp, alamat_lengkap, kota, provinsi, kode_pos),
+          payments (id, payment_reference, payment_method, payment_status, va_number, amount, paid_at),
+          order_items (
+            id,
+            quantity,
+            harga,
+            subtotal,
+            varian_id,
+            product_variants (
+              id,
+              nama_varian,
+              products (
+                id,
+                nama_produk,
+                gambar_url
+              )
+            )
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        const mappedOrders = data.map((d) => mapDbOrder(d));
+        // Gabungkan dengan pesanan lokal baru yang belum ada di database
+        const currentLocal = this.getAllOrders();
+        const merged: Order[] = [...mappedOrders];
+        for (const loc of currentLocal) {
+          if (!merged.some((m) => m.id.toLowerCase() === loc.id.toLowerCase() || (loc.dbId && m.dbId === loc.dbId))) {
+            merged.push(loc);
+          }
+        }
+        this.saveOrders(merged);
+        return merged;
+      }
+    } catch (err) {
+      console.warn("Gagal fetch orders langsung dari Supabase, menggunakan cache:", err);
+    }
+    return this.getAllOrders();
+  },
+
+  // Ambil detail pesanan berdasarkan ID atau alias (misal: TRX-002 -> ORD-20260921-BATIK-003)
   getOrderById(id: string): Order | null {
+    if (!id) return null;
+    const cleanId = id.trim().toLowerCase();
+    const resolvedId = ORDER_ALIASES[cleanId] ? ORDER_ALIASES[cleanId].toLowerCase() : cleanId;
+
     const orders = this.getAllOrders();
     const found = orders.find(
-      (o) => o.id.toLowerCase() === id.toLowerCase() || o.invoiceNo.toLowerCase() === id.toLowerCase()
+      (o) =>
+        o.id.toLowerCase() === resolvedId ||
+        o.invoiceNo.toLowerCase() === resolvedId ||
+        o.id.toLowerCase() === cleanId ||
+        (o.dbId && o.dbId.toLowerCase() === cleanId)
     );
     return found || null;
   },
@@ -412,8 +678,13 @@ export const orderService = {
   getCustomerOrders(customerEmail?: string): Order[] {
     const orders = this.getAllOrders();
     if (!customerEmail) return orders;
+    const cleanEmail = customerEmail.toLowerCase().trim();
     return orders.filter(
-      (o) => !o.customerEmail || o.customerEmail.toLowerCase() === customerEmail.toLowerCase() || o.customer.toLowerCase().includes("andi")
+      (o) =>
+        !o.customerEmail ||
+        o.customerEmail.toLowerCase().includes(cleanEmail) ||
+        cleanEmail.includes(o.customerEmail.toLowerCase()) ||
+        o.customer.toLowerCase().includes("andi")
     );
   },
 
@@ -432,6 +703,66 @@ export const orderService = {
     });
   },
 
+  // Update status pesanan (oleh UMKM atau Admin) dan otomatis update Supabase Database
+  async updateOrderStatus(orderId: string, newStatus: OrdStatus, trackingNumber?: string): Promise<Order | null> {
+    const cleanId = orderId.trim().toLowerCase();
+    const resolvedId = ORDER_ALIASES[cleanId] ? ORDER_ALIASES[cleanId].toLowerCase() : cleanId;
+
+    const orders = this.getAllOrders();
+    const index = orders.findIndex(
+      (o) =>
+        o.id.toLowerCase() === resolvedId ||
+        o.invoiceNo.toLowerCase() === resolvedId ||
+        o.id.toLowerCase() === cleanId ||
+        (o.dbId && o.dbId.toLowerCase() === cleanId)
+    );
+
+    if (index === -1) return null;
+
+    const ord = { ...orders[index] };
+    ord.orderStatus = newStatus;
+    if (trackingNumber) ord.trackingNumber = trackingNumber;
+
+    // Hitung ulang timeline berdasarkan status baru
+    ord.timeline = buildTimeline(newStatus, ord.payStatus, ord.date, ord.time, ord.umkm, ord.trackingNumber);
+
+    orders[index] = ord;
+    this.saveOrders(orders);
+
+    // Kirim pembaruan ke Database Supabase secara asynchronous
+    try {
+      const dbStatus =
+        newStatus === "SELESAI"
+          ? "COMPLETED"
+          : newStatus === "DIKIRIM"
+          ? "SHIPPED"
+          : newStatus === "DIPROSES"
+          ? "PROCESSING"
+          : newStatus === "DIBATALKAN"
+          ? "CANCELLED"
+          : "PENDING";
+
+      const updatePayload: Record<string, unknown> = {
+        status_order: dbStatus,
+        updated_at: new Date().toISOString(),
+      };
+      if (trackingNumber && trackingNumber !== "—") {
+        updatePayload.resi_pengiriman = trackingNumber;
+      }
+
+      // Coba update berdasarkan id order_number atau id database (dbId)
+      if (ord.dbId) {
+        await (supabase.from("orders") as any).update(updatePayload).eq("id", ord.dbId);
+      } else {
+        await (supabase.from("orders") as any).update(updatePayload).eq("order_number", ord.id);
+      }
+    } catch (dbErr) {
+      console.warn("Gagal update status pesanan ke database Supabase:", dbErr);
+    }
+
+    return ord;
+  },
+
   // Buat pesanan baru saat checkout berhasil dibayar
   createOrder(payload: CreateOrderPayload): Order {
     const now = new Date();
@@ -445,7 +776,6 @@ export const orderService = {
     const orderId = `ORD-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${randomSuffix}`;
     const invoiceNo = `INV/${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}/AQRA/${randomSuffix}`;
 
-    // Tentukan nama UMKM toko asal dari item pertama yang dibeli
     const primaryUmkm = payload.items[0]?.umkm || "Batik Danar Solo";
     const matchedUmkmMeta = DB_UMKM_MAP[primaryUmkm] || {
       id: "c35c1bff-7eb9-4977-be68-c706f1aa7ea4",
@@ -492,40 +822,9 @@ export const orderService = {
       items: orderItems,
       subtotal: payload.subtotal,
       shippingCost: payload.ongkir,
-      platformFee: 1000,
+      platformFee: 0,
       total: payload.total,
-      timeline: [
-        {
-          label: "Pesanan Dibuat",
-          desc: "Pesanan berhasil dibuat oleh pembeli",
-          date: `${dateStr} · ${timeStr}`,
-          status: "done",
-        },
-        {
-          label: "Pembayaran Berhasil",
-          desc: `Terverifikasi via ${payload.paymentMethod || "Finnet Gateway"}`,
-          date: `${dateStr} · ${timeStr}`,
-          status: "done",
-        },
-        {
-          label: "Pesanan Diproses",
-          desc: `${primaryUmkm} sedang menyiapkan pesanan`,
-          date: `${dateStr} · ${timeStr}`,
-          status: "active",
-        },
-        {
-          label: "Pesanan Dikirim",
-          desc: `Estimasi tiba 2-3 hari via ${payload.shippingOption?.label || "Kurir"}`,
-          date: "—",
-          status: "pending",
-        },
-        {
-          label: "Pesanan Selesai",
-          desc: "Konfirmasi penerimaan oleh pembeli",
-          date: "—",
-          status: "pending",
-        },
-      ],
+      timeline: buildTimeline("BARU", "PAID", dateStr, timeStr, primaryUmkm),
     };
 
     const currentOrders = this.getAllOrders();
@@ -533,42 +832,185 @@ export const orderService = {
     this.saveOrders(updated);
     this.setActiveOrderId(newOrder.id);
 
+    // Asynchronously simpan ke Supabase Database
+    (async () => {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const customerId = userData?.user?.id || "baa1f7c0-2223-45bb-9b49-9398af9dbda7";
+
+        // 1. Pastikan customer profile ada di DB
+        try {
+          await (supabase.from("profiles") as any).upsert([
+            {
+              id: customerId,
+              email: userData?.user?.email || "customer@gmail.com",
+              nama: payload.shippingAddress.name || "Andi Pratama",
+              role: "CUSTOMER",
+              no_hp: payload.shippingAddress.phone || "0812-3456-7890",
+            },
+          ]);
+        } catch {
+          // ignore
+        }
+
+        // 2. Pastikan alamat pengiriman valid ada di DB
+        let alamatId = "ef60cdb5-fc4a-4c6a-8084-2f0c6876b85c";
+        try {
+          const { data: existingAddr } = await (supabase.from("addresses") as any)
+            .select("id")
+            .eq("customer_id", customerId)
+            .limit(1)
+            .maybeSingle();
+
+          if (existingAddr?.id) {
+            alamatId = existingAddr.id;
+          } else {
+            const { data: newAddr } = await (supabase.from("addresses") as any)
+              .insert([
+                {
+                  customer_id: customerId,
+                  nama_penerima: payload.shippingAddress.name || "Andi Pratama",
+                  no_hp: payload.shippingAddress.phone || "0812-3456-7890",
+                  alamat_lengkap: payload.shippingAddress.address || "Jl. Merdeka No. 45",
+                  kota: payload.shippingAddress.city || "Bandung",
+                  provinsi: "Jawa Barat",
+                  kode_pos: payload.shippingAddress.zip || "40111",
+                  is_primary: true,
+                },
+              ])
+              .select("id")
+              .single();
+            if (newAddr?.id) alamatId = newAddr.id;
+          }
+        } catch {
+          // ignore
+        }
+
+        // 3. Insert payment
+        const { data: payData, error: payErr } = await (supabase.from("payments") as any)
+          .insert([
+            {
+              customer_id: customerId,
+              payment_reference: newOrder.paymentRef,
+              payment_method: payload.paymentMethod || "Finnet Finpay",
+              amount: newOrder.total,
+              payment_status: "PAID",
+              paid_at: now.toISOString(),
+            },
+          ])
+          .select()
+          .single();
+
+        if (payErr) {
+          console.warn("Gagal simpan payment ke Supabase:", payErr);
+        }
+
+        if (payData) {
+          // 4. Insert order
+          const { data: ordData, error: ordErr } = await (supabase.from("orders") as any)
+            .insert([
+              {
+                order_number: newOrder.id,
+                payment_id: payData.id,
+                customer_id: customerId,
+                umkm_id: matchedUmkmMeta.id,
+                alamat_id: alamatId,
+                total_harga: newOrder.total,
+                ongkir: newOrder.shippingCost,
+                status_order: "PENDING",
+              },
+            ])
+            .select()
+            .single();
+
+          if (ordErr) {
+            console.warn("Gagal simpan order ke Supabase:", ordErr);
+          }
+
+          if (ordData) {
+            newOrder.dbId = ordData.id;
+
+            // 5. Insert order_items untuk SEMUA item yang dipesan
+            for (const item of payload.items) {
+              let varianId = item.variantId;
+              if (!varianId && item.productId) {
+                const { data: vData } = await (supabase.from("product_variants") as any)
+                  .select("id")
+                  .eq("product_id", item.productId)
+                  .limit(1)
+                  .maybeSingle();
+                varianId = vData?.id;
+              }
+
+              // Fallback varian jika tidak ketemu
+              if (!varianId) {
+                const { data: anyVar } = await (supabase.from("product_variants") as any)
+                  .select("id")
+                  .limit(1)
+                  .maybeSingle();
+                varianId = anyVar?.id;
+              }
+
+              if (varianId) {
+                await (supabase.from("order_items") as any).insert([
+                  {
+                    order_id: ordData.id,
+                    varian_id: varianId,
+                    quantity: item.qty || 1,
+                    harga: item.price || 0,
+                    subtotal: (item.price || 0) * (item.qty || 1),
+                  },
+                ]);
+              }
+            }
+
+            // Sync ulang database Supabase dan kirim broadcast pembaruan
+            await this.fetchOrdersFromDatabase();
+          }
+        }
+      } catch (e) {
+        console.warn("Gagal simpan order baru ke database Supabase:", e);
+      }
+    })();
+
     return newOrder;
   },
 
-  // Update status pesanan (oleh UMKM atau Admin)
-  updateOrderStatus(orderId: string, newStatus: OrdStatus, trackingNumber?: string): Order | null {
-    const orders = this.getAllOrders();
-    const index = orders.findIndex(
-      (o) => o.id.toLowerCase() === orderId.toLowerCase() || o.invoiceNo.toLowerCase() === orderId.toLowerCase()
-    );
-    if (index === -1) return null;
+  // Berlangganan perubahan status order secara real-time
+  subscribe(callback: (orders: Order[]) => void): () => void {
+    const handleSync = () => {
+      callback(this.getAllOrders());
+    };
 
-    const ord = orders[index];
-    ord.orderStatus = newStatus;
-    if (trackingNumber) ord.trackingNumber = trackingNumber;
+    window.addEventListener("aqraone_order_sync", handleSync);
+    window.addEventListener("storage", (e) => {
+      if (e.key === STORAGE_KEY) handleSync();
+    });
 
-    const now = new Date();
-    const timeStr = `${now.toLocaleDateString("id-ID", { day: "numeric", month: "short" })} · ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} WIB`;
-
-    if (newStatus === "DIPROSES") {
-      ord.timeline = ord.timeline.map((t) => {
-        if (t.label === "Pesanan Diproses") return { ...t, status: "active", date: timeStr };
-        return t;
-      });
-    } else if (newStatus === "DIKIRIM") {
-      ord.timeline = ord.timeline.map((t) => {
-        if (t.label === "Pesanan Diproses") return { ...t, status: "done" };
-        if (t.label === "Pesanan Dikirim") return { ...t, status: "active", date: timeStr, desc: `Resi: ${ord.trackingNumber || "Terkirim ke kurir"}` };
-        return t;
-      });
-    } else if (newStatus === "SELESAI") {
-      ord.timeline = ord.timeline.map((t) => ({ ...t, status: "done", date: t.date === "—" ? timeStr : t.date }));
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      bc = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+      bc.onmessage = (e) => {
+        if (e.data?.type === "SYNC_ORDERS") {
+          callback(this.getAllOrders());
+        }
+      };
     }
 
-    orders[index] = { ...ord };
-    this.saveOrders(orders);
-    return orders[index];
+    // Dengarkan juga perubahan dari Supabase Realtime jika ada
+    const channel = supabase
+      .channel("orders-realtime-listener")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, async () => {
+        const refreshed = await this.fetchOrdersFromDatabase();
+        callback(refreshed);
+      })
+      .subscribe();
+
+    return () => {
+      window.removeEventListener("aqraone_order_sync", handleSync);
+      if (bc) bc.close();
+      supabase.removeChannel(channel);
+    };
   },
 
   // Active order ID helper

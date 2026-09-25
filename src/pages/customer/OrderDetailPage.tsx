@@ -1,14 +1,51 @@
+import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router";
 import Navbar from "../../components/ui/Navbar";
 import Timeline from "../../components/ui/Timeline";
 import { StatusBadge } from "../../components/ui/Badge";
 import { formatRp } from "../../components/ui/ProductCard";
 import Button from "../../components/ui/Button";
-import { orderService } from "../../services/order.service";
+import { orderService, type Order } from "../../services/order.service";
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const order = (id ? orderService.getOrderById(id) : null) || orderService.getAllOrders()[0];
+  const [order, setOrder] = useState<Order | null>(() => {
+    return (id ? orderService.getOrderById(id) : null) || orderService.getAllOrders()[0] || null;
+  });
+  const [completing, setCompleting] = useState(false);
+
+  useEffect(() => {
+    const refreshOrder = () => {
+      const found = (id ? orderService.getOrderById(id) : null) || orderService.getAllOrders()[0] || null;
+      if (found) setOrder({ ...found });
+    };
+
+    // 1. Muat awal
+    refreshOrder();
+
+    // 2. Fetch data asli dari database Supabase
+    orderService.fetchOrdersFromDatabase().then(() => {
+      refreshOrder();
+    });
+
+    // 3. Berlangganan perubahan real-time (saat UMKM atau Admin verifikasi/selesaikan pesanan)
+    const unsubscribe = orderService.subscribe(() => {
+      refreshOrder();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [id]);
+
+  const handleConfirmReceived = async () => {
+    if (!order) return;
+    setCompleting(true);
+    await orderService.updateOrderStatus(order.id, "SELESAI");
+    const updated = orderService.getOrderById(order.id);
+    if (updated) setOrder({ ...updated });
+    setCompleting(false);
+  };
 
   if (!order) {
     return (
@@ -18,7 +55,7 @@ export default function OrderDetailPage() {
           <p className="text-4xl mb-3">🔍</p>
           <h1 className="text-xl font-bold text-[#202020]">Pesanan Tidak Ditemukan</h1>
           <p className="text-sm text-[#6B6B6B] mt-1 mb-6">
-            ID pesanan yang Anda cari tidak terdaftar atau telah dihapus.
+            ID pesanan yang Anda cari tidak terdaftar atau sedang dimuat dari database.
           </p>
           <Link to="/orders">
             <Button variant="primary" size="md">Kembali ke Pesanan Saya</Button>
@@ -36,7 +73,7 @@ export default function OrderDetailPage() {
         <div className="flex items-center gap-2 text-sm text-[#6B6B6B] mb-4">
           <Link to="/orders" className="hover:text-[#D4AF37]">Pesanan Saya</Link>
           <span>/</span>
-          <span className="text-[#202020] font-medium">{order.id}</span>
+          <span className="text-[#202020] font-medium font-mono">{order.id}</span>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -46,7 +83,7 @@ export default function OrderDetailPage() {
               Invoice: <span className="font-mono text-[#D4AF37] font-semibold">{order.invoiceNo}</span> · Dibuat pada {order.date} pukul {order.time}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <StatusBadge status={order.payStatus} type="payment" />
             <StatusBadge status={order.orderStatus} type="order" />
           </div>
@@ -120,7 +157,7 @@ export default function OrderDetailPage() {
                 <div className="flex items-start gap-2">
                   <span className="text-xs text-[#6B6B6B] w-24 shrink-0">Nomor Resi:</span>
                   <span className="text-xs font-mono font-bold text-[#D4AF37]">
-                    {order.trackingNumber || "Menunggu konfirmasi kurir"}
+                    {order.trackingNumber && order.trackingNumber !== "—" ? order.trackingNumber : "Menunggu penyerahan paket"}
                   </span>
                 </div>
                 {order.shippingNotes && (
@@ -138,6 +175,21 @@ export default function OrderDetailPage() {
             <div className="bg-white rounded-2xl border border-[#E5E5E5] p-5 shadow-xs">
               <h2 className="font-semibold text-[#202020] mb-4">📋 Status Pesanan</h2>
               <Timeline steps={order.timeline} />
+
+              {/* Action Button untuk Customer jika barang sudah dikirim */}
+              {order.orderStatus === "DIKIRIM" && (
+                <div className="mt-4 pt-4 border-t border-[#F0EEE9]">
+                  <Button
+                    variant="primary"
+                    size="md"
+                    className="w-full justify-center"
+                    loading={completing}
+                    onClick={handleConfirmReceived}
+                  >
+                    Konfirmasi Pesanan Diterima
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Total Price Summary */}
@@ -152,10 +204,12 @@ export default function OrderDetailPage() {
                   <span>Ongkos Kirim</span>
                   <span>{formatRp(order.shippingCost)}</span>
                 </div>
-                <div className="flex justify-between text-[#6B6B6B]">
-                  <span>Biaya Layanan Platform</span>
-                  <span>{formatRp(order.platformFee)}</span>
-                </div>
+                {order.platformFee > 0 && (
+                  <div className="flex justify-between text-[#6B6B6B]">
+                    <span>Biaya Layanan Platform</span>
+                    <span>{formatRp(order.platformFee)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-[#202020] pt-2.5 border-t border-[#E5E5E5] text-base">
                   <span>Total Tagihan</span>
                   <span className="text-[#C9A227]">{formatRp(order.total)}</span>

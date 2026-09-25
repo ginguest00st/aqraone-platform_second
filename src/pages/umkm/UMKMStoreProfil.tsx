@@ -97,7 +97,18 @@ export default function UMKMStoreProfil() {
         throw error || new Error("Gagal memperbarui profil toko");
       }
 
-      setUmkm((prev) => (prev ? { ...prev, ...data } : (data as unknown as UmkmWithCategory)));
+      const selectedCategory = categories.find((c) => c.id === form.kategori_umkm_id);
+      setUmkm((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...data,
+              kategori_umkm: selectedCategory
+                ? { id: selectedCategory.id, nama_kategori: selectedCategory.nama_kategori }
+                : (form.kategori_umkm_id ? prev.kategori_umkm : null),
+            }
+          : (data as unknown as UmkmWithCategory)
+      );
       setEdit(false);
       setFeedback({ type: "success", message: "Profil toko berhasil diperbarui di Supabase!" });
     } catch (err: unknown) {

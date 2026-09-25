@@ -10,6 +10,7 @@ import { IconDashboard, IconStore, IconPackage, IconBarChart, IconLogout, IconPl
 import { useAuth } from "../../app/contexts/AuthContext";
 import { umkmService, type UmkmWithCategory } from "../../services/umkm.service";
 import { productService, type ProductDetail } from "../../services/product.service";
+import { sanitizeProductImageUrl, getProductFallbackImage } from "../../lib/imageUtils";
 
 const sidebarItems = [
   { to: "/umkm/dashboard", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
@@ -95,13 +96,20 @@ export default function UMKMProductsPage() {
     {
       key: "image",
       header: "Foto",
-      render: (r: ProductDetail) => (
-        <img
-          src={r.gambar_url || "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=80&h=80&fit=crop&auto=format"}
-          alt={r.nama_produk}
-          className="w-12 h-12 rounded-xl object-cover border border-[#E8E6E1]"
-        />
-      ),
+      render: (r: ProductDetail) => {
+        const fallback = getProductFallbackImage(r.kategori_produk?.nama_kategori || r.nama_produk);
+        return (
+          <img
+            src={sanitizeProductImageUrl(r.gambar_url, r.kategori_produk?.nama_kategori || r.nama_produk)}
+            alt={r.nama_produk}
+            className="w-12 h-12 rounded-xl object-cover border border-[#E8E6E1]"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = fallback;
+            }}
+          />
+        );
+      },
     },
     {
       key: "name",

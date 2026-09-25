@@ -9,6 +9,7 @@ import {
 } from "../../components/ui/Icons";
 import { productService, type ProductWithUmkm } from "../../services/product.service";
 import { umkmService, type UmkmWithCategory } from "../../services/umkm.service";
+import { sanitizeProductImageUrl } from "../../lib/imageUtils";
 
 const allProducts = [
   { id: "1",  name: "Keripik Pisang Original",  umkm: "Naraya Snack",    price: 25000,  rating: 4.8, stock: 120, image: "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop&auto=format", badge: "hot" as const },
@@ -87,7 +88,7 @@ export default function HomePage() {
           price: minPrice,
           rating: 4.8,
           stock: totalStock,
-          image: p.gambar_url || "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&h=300&fit=crop",
+          image: sanitizeProductImageUrl(p.gambar_url, p.nama_produk),
           badge: (p.status === "AKTIF" ? "hot" : undefined) as "hot" | undefined,
         };
       })

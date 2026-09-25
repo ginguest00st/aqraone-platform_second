@@ -11,6 +11,7 @@ import { useAuth } from "../../app/contexts/AuthContext";
 import { productService, type ProductWithUmkm } from "../../services/product.service";
 import { categoryService } from "../../services/category.service";
 import type { KategoriProduk } from "../../types/database.types";
+import { sanitizeProductImageUrl, getProductFallbackImage } from "../../lib/imageUtils";
 
 const sidebarItems = [
   { to: "/admin", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
@@ -92,13 +93,20 @@ export default function AdminProductMonitorPage() {
     {
       key: "image",
       header: "Foto",
-      render: (r: ProductWithUmkm) => (
-        <img
-          src={r.gambar_url || "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=60&h=60&fit=crop&auto=format"}
-          alt=""
-          className="w-12 h-12 rounded-xl object-cover border border-[#E8E6E1]"
-        />
-      ),
+      render: (r: ProductWithUmkm) => {
+        const fallback = getProductFallbackImage(r.kategori_produk?.nama_kategori || r.nama_produk);
+        return (
+          <img
+            src={sanitizeProductImageUrl(r.gambar_url, r.kategori_produk?.nama_kategori || r.nama_produk)}
+            alt={r.nama_produk}
+            className="w-12 h-12 rounded-xl object-cover border border-[#E8E6E1]"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = fallback;
+            }}
+          />
+        );
+      },
     },
     {
       key: "name",

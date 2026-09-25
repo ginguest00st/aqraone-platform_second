@@ -7,15 +7,37 @@ import { formatRp } from "../../components/ui/ProductCard";
 import Button from "../../components/ui/Button";
 
 import { orderService, type Order } from "../../services/order.service";
+import { useAuth } from "../../app/contexts/AuthContext";
+import { useCart } from "../../app/contexts/CartContext";
 
 export default function OrderHistoryPage() {
+  const { user } = useAuth();
+  const { cartCount } = useCart();
   const [activeTab, setActiveTab] = useState("all");
-  const [ordersList, setOrdersList] = useState<Order[]>(() => orderService.getCustomerOrders());
+  const [ordersList, setOrdersList] = useState<Order[]>(() => orderService.getCustomerOrders(user?.email));
 
   useEffect(() => {
-    // Muat data pesanan terbaru setiap kali halaman dibuka
-    setOrdersList(orderService.getCustomerOrders());
-  }, []);
+    const refresh = () => {
+      setOrdersList(orderService.getCustomerOrders(user?.email));
+    };
+
+    // 1. Muat awal dari cache tersinkronisasi
+    refresh();
+
+    // 2. Tarik data terbaru dari Supabase Database
+    orderService.fetchOrdersFromDatabase().then(() => {
+      refresh();
+    });
+
+    // 3. Berlangganan event real-time (antar-tab & realtime Supabase)
+    const unsubscribe = orderService.subscribe(() => {
+      refresh();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user?.email]);
 
   const counts = {
     all: ordersList.length,
@@ -43,7 +65,7 @@ export default function OrderHistoryPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar user={{ name: "Andi", role: "customer" }} />
+      <Navbar cartCount={cartCount} user={{ name: user?.name?.split(" ")[0] || "Andi", role: "customer" }} />
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         <h1 className="text-xl font-bold text-[#202020] mb-4">Pesanan Saya</h1>
@@ -73,6 +95,10 @@ export default function OrderHistoryPage() {
                         src={productImage}
                         alt=""
                         className="w-16 h-16 rounded-xl object-cover shrink-0 bg-[#F8F8F6] border border-[#E8E6E1]"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=100&h=100&fit=crop&auto=format";
+                        }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
