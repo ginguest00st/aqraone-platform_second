@@ -13,8 +13,26 @@ export default function OrderHistoryPage() {
   const [ordersList, setOrdersList] = useState<Order[]>(() => orderService.getCustomerOrders());
 
   useEffect(() => {
-    // Muat data pesanan terbaru setiap kali halaman dibuka
-    setOrdersList(orderService.getCustomerOrders());
+    const refresh = () => {
+      setOrdersList(orderService.getCustomerOrders());
+    };
+
+    // 1. Muat awal dari cache tersinkronisasi
+    refresh();
+
+    // 2. Tarik data terbaru dari Supabase Database
+    orderService.fetchOrdersFromDatabase().then(() => {
+      refresh();
+    });
+
+    // 3. Berlangganan event real-time (antar-tab & realtime Supabase)
+    const unsubscribe = orderService.subscribe(() => {
+      refresh();
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const counts = {

@@ -17,6 +17,7 @@ import {
   IconLogout,
 } from "../../components/ui/Icons";
 import { supabase } from "../../lib/supabase";
+import { orderService } from "../../services/order.service";
 
 const sidebarItems = [
   { to: "/admin", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
@@ -493,6 +494,12 @@ export default function AdminTransactionPage() {
       }
     }
     loadTransactions();
+
+    const unsubscribe = orderService.subscribe(() => {
+      loadTransactions();
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleUpdateOrderStatus = async (newStatus: OrdStatus) => {
@@ -514,6 +521,9 @@ export default function AdminTransactionPage() {
     setSelectedTx(updatedTx);
     setTransactions((prev) => prev.map((t) => (t.id === prevId ? updatedTx : t)));
     showToast(`Status pesanan ${prevId} berhasil diubah menjadi: ${newStatus}`);
+
+    // Update order service & broadcast ke UMKM dan Customer
+    await orderService.updateOrderStatus(prevId, newStatus);
 
     // Persist to Supabase if dbId exists
     if (selectedTx.dbId) {
@@ -552,6 +562,9 @@ export default function AdminTransactionPage() {
     setTransactions((prev) => prev.map((t) => (t.id === prevId ? updatedTx : t)));
     setEditingResi(false);
     showToast(`Nomor resi ${prevId} diperbarui: ${newResi}`);
+
+    // Update orderService & broadcast ke UMKM dan Customer
+    await orderService.updateOrderStatus(prevId, "DIKIRIM", newResi);
 
     if (selectedTx.dbId) {
       await (supabase.from("orders") as any).update({ resi_pengiriman: newResi }).eq("id", selectedTx.dbId);

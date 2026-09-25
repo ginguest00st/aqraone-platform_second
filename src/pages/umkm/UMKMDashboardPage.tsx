@@ -51,11 +51,7 @@ const topProducts = [
 
 const PALETTE = ["#C9A227", "#1A1714", "#EDD882", "#E8E6E1"];
 
-const recentOrders = [
-  { id: "ORD-001", customer: "Siti Rahayu",   product: "Keripik Pisang x2",  total: 50000,  status: "BARU" },
-  { id: "ORD-002", customer: "Budi Santoso",  product: "Keripik Tempe x3",   total: 60000,  status: "DIPROSES" },
-  { id: "ORD-003", customer: "Dewi Lestari",  product: "Kripik Singkong x1", total: 18000,  status: "DIKIRIM" },
-];
+import { orderService, type Order } from "../../services/order.service";
 
 function formatRp(n: number) { return "Rp" + n.toLocaleString("id-ID"); }
 
@@ -72,6 +68,7 @@ export default function UMKMDashboardPage() {
   const { user, profile, logout } = useAuth();
   const [umkm, setUmkm] = useState<UmkmWithCategory | null>(null);
   const [products, setProducts] = useState<ProductDetail[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Order[]>(() => orderService.getUmkmOrders("ALL").slice(0, 5));
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -91,6 +88,17 @@ export default function UMKMDashboardPage() {
       }
     }
     loadUMKM();
+
+    // Muat pesanan dari database
+    orderService.fetchOrdersFromDatabase().then((orders) => {
+      setRecentOrders(orders.slice(0, 5));
+    });
+
+    const unsubscribe = orderService.subscribe((orders) => {
+      setRecentOrders(orders.slice(0, 5));
+    });
+
+    return () => unsubscribe();
   }, [user]);
 
   const activeProductsCount = products.filter(p => p.status === "AKTIF").length;
@@ -298,21 +306,23 @@ export default function UMKMDashboardPage() {
             </div>
             <div className="space-y-2">
               {recentOrders.map(order => (
-                <div key={order.id} data-figma-layer="OrderRow"
-                  className="flex items-center gap-4 p-4 bg-[#FAFAF8] border border-[#E8E6E1] rounded-[14px] hover:border-[#C9A227] hover:bg-[#FDF6E3] transition-all"
-                >
-                  <div className="w-10 h-10 bg-[#1A1714] rounded-[12px] flex items-center justify-center text-white font-bold text-[11px] shrink-0">
-                    {order.id.slice(-3)}
+                <Link key={order.id} to={`/umkm/transactions/${order.id}`}>
+                  <div data-figma-layer="OrderRow"
+                    className="flex items-center gap-4 p-4 bg-[#FAFAF8] border border-[#E8E6E1] rounded-[14px] hover:border-[#C9A227] hover:bg-[#FDF6E3] transition-all cursor-pointer mb-2"
+                  >
+                    <div className="w-10 h-10 bg-[#1A1714] rounded-[12px] flex items-center justify-center text-white font-bold text-[11px] shrink-0 font-mono">
+                      {order.id.slice(-3)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-[#1A1714]">{order.customer}</p>
+                      <p className="text-[11px] text-[#ABA9A4] truncate">{order.items[0]?.name || "Produk UMKM"}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[13px] font-bold text-[#1A1714]">{formatRp(order.total)}</p>
+                      <StatusBadge status={order.orderStatus} type="order" />
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-[#1A1714]">{order.customer}</p>
-                    <p className="text-[11px] text-[#ABA9A4] truncate">{order.product}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-[13px] font-bold text-[#1A1714]">{formatRp(order.total)}</p>
-                    <StatusBadge status={order.status as "BARU" | "DIPROSES" | "DIKIRIM"} type="order" />
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
