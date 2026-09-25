@@ -12,6 +12,7 @@ export default function ProductDetailPage() {
   const { id } = useParams();
   const [product, setProduct] = useState<any>(null);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [activeImg, setActiveImg] = useState(0);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
@@ -20,6 +21,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (!id) return;
+    setLoading(true);
     supabase
       .from("products")
       .select(`
@@ -41,12 +43,15 @@ export default function ProductDetailPage() {
             setSelectedVariant(prodData.product_variants[0]);
           }
         }
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, [id]);
 
-  const productName = product?.nama_produk || "Produk UMKM";
-  const storeName = product?.umkm?.nama_toko || "Toko UMKM";
-  const categoryName = product?.kategori_produk?.nama_kategori || "";
+  const productName = product?.nama_produk || "Batik Kawung";
+  const storeName = product?.umkm?.nama_toko || "Batik Danar Solo";
+  const categoryName = product?.kategori_produk?.nama_kategori || "Pakaian & Tekstil";
   const fallbackImg = getProductFallbackImage(categoryName || productName);
   const rawImage = product?.gambar_url;
   const validMainImage = (rawImage && typeof rawImage === "string" && !rawImage.startsWith("blob:"))
@@ -54,7 +59,7 @@ export default function ProductDetailPage() {
     : fallbackImg;
   const images = [validMainImage];
   const price = selectedVariant?.harga ? Number(selectedVariant.harga) : 25000;
-  const stock = selectedVariant?.stock_levels?.sisa_stok ?? 100;
+  const stock = selectedVariant?.stock_levels?.sisa_stok ?? 22;
   const variants = product?.product_variants || [];
 
   const handleAddToCart = () => {
@@ -85,6 +90,18 @@ export default function ProductDetailPage() {
     });
     navigate("/checkout");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8F8F6]">
+        <Navbar user={{ name: "Andi", role: "customer" }} />
+        <div className="max-w-4xl mx-auto px-4 py-24 text-center">
+          <div className="w-10 h-10 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm font-semibold text-[#202020]">Memuat informasi produk...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">

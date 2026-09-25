@@ -459,40 +459,64 @@ function mapDbOrder(o: any): Order {
   const umkmId = o.umkm_id || rawUmkm?.id;
 
   const rawItems = o.order_items || [];
-  const items: OrderItem[] =
-    rawItems.length > 0
-      ? rawItems.map((it: any) => {
-          const prod = it.product_variants?.products;
-          const img =
-            prod?.gambar_url ||
-            (prod?.id && PRODUCT_CATALOG_IMAGES[prod.id]) ||
-            "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80";
-          return {
-            id: it.id,
-            productId: prod?.id || it.varian_id || "prod-default",
-            variantId: it.varian_id,
-            name: prod?.nama_produk || "Produk UMKM",
-            variant: it.product_variants?.nama_varian || "Standard",
-            price: Number(it.harga) || 0,
-            qty: Number(it.quantity) || 1,
-            subtotal: Number(it.subtotal) || (Number(it.harga) || 0) * (Number(it.quantity) || 1),
-            image: img,
-            umkm: umkmName,
-          };
-        })
-      : [
-          {
-            id: `item-${o.id}`,
-            productId: "prod-default",
-            name: "Produk UMKM",
-            variant: "Standard",
-            price: Number(o.total_harga) || 100000,
-            qty: 1,
-            subtotal: Number(o.total_harga) || 100000,
-            image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80",
-            umkm: umkmName,
-          },
-        ];
+  let items: OrderItem[] = [];
+  if (rawItems.length > 0) {
+    items = rawItems.map((it: any) => {
+      const prod = it.product_variants?.products;
+      const img =
+        prod?.gambar_url ||
+        (prod?.id && PRODUCT_CATALOG_IMAGES[prod.id]) ||
+        "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80";
+      const resolvedName = prod?.nama_produk || it.product_variants?.nama_varian || (umkmName.includes("Batik") ? "Batik Kawung" : "Produk Pilihan UMKM");
+      return {
+        id: it.id,
+        productId: prod?.id || it.varian_id || "prod-default",
+        variantId: it.varian_id,
+        name: resolvedName,
+        variant: it.product_variants?.nama_varian || "Standard",
+        price: Number(it.harga) || 0,
+        qty: Number(it.quantity) || 1,
+        subtotal: Number(it.subtotal) || (Number(it.harga) || 0) * (Number(it.quantity) || 1),
+        image: img,
+        umkm: umkmName,
+      };
+    });
+  } else {
+    // Cek jika pesanan ini sudah ada itemnya di cache lokal (agar nama produk tidak tertimpa)
+    let localItems: OrderItem[] | null = null;
+    if (typeof localStorage !== "undefined") {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const list = JSON.parse(raw);
+          const found = list.find((x: Order) => x.id === orderNum || (x.dbId && x.dbId === o.id));
+          if (found && found.items && found.items.length > 0) {
+            localItems = found.items;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (localItems) {
+      items = localItems;
+    } else {
+      items = [
+        {
+          id: `item-${o.id}`,
+          productId: "prod-default",
+          name: umkmName.includes("Batik") ? "Batik Kawung" : "Produk Pilihan UMKM",
+          variant: "Standard",
+          price: Number(o.total_harga) || 40000,
+          qty: 1,
+          subtotal: Number(o.total_harga) || 40000,
+          image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80",
+          umkm: umkmName,
+        },
+      ];
+    }
+  }
 
   const subtotal = items.reduce((acc, i) => acc + i.subtotal, 0);
   const shippingCost = Number(o.ongkir) || 0;
@@ -808,38 +832,140 @@ export const orderService = {
     this.saveOrders(updated);
     this.setActiveOrderId(newOrder.id);
 
-    // Asynchronously simpan ke Supabase jika customer login
+    // Asynchronously simpan ke Supabase Database
     (async () => {
       try {
         const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user) {
-          // 1. Insert payment
-          const { data: payData } = await (supabase.from("payments") as any).insert([{
-            customer_id: userData.user.id,
-            payment_reference: newOrder.paymentRef,
-            payment_method: payload.paymentMethod || "FINNET_QRIS",
-            amount: newOrder.total,
-            payment_status: "PAID",
-            paid_at: now.toISOString(),
-          }]).select().single();
+        const customerId = userData?.user?.id || "baa1f7c0-2223-45bb-9b49-9398af9dbda7";
 
-          if (payData) {
-            // 2. Insert order
-            const { data: ordData } = await (supabase.from("orders") as any).insert([{
-              order_number: newOrder.id,
-              payment_id: payData.id,
-              customer_id: userData.user.id,
-              umkm_id: matchedUmkmMeta.id,
-              alamat_id: "f8d5ceff-2e83-45d8-b9df-c5e3d766f71b",
-              total_harga: newOrder.total,
-              ongkir: newOrder.shippingCost,
-              status_order: "PENDING",
-            }]).select().single();
+        // 1. Pastikan customer profile ada di DB
+        try {
+          await (supabase.from("profiles") as any).upsert([
+            {
+              id: customerId,
+              email: userData?.user?.email || "customer@gmail.com",
+              nama: payload.shippingAddress.name || "Andi Pratama",
+              role: "CUSTOMER",
+              no_hp: payload.shippingAddress.phone || "0812-3456-7890",
+            },
+          ]);
+        } catch {
+          // ignore
+        }
 
-            if (ordData) {
-              newOrder.dbId = ordData.id;
-              this.saveOrders([newOrder, ...currentOrders]);
+        // 2. Pastikan alamat pengiriman valid ada di DB
+        let alamatId = "ef60cdb5-fc4a-4c6a-8084-2f0c6876b85c";
+        try {
+          const { data: existingAddr } = await (supabase.from("addresses") as any)
+            .select("id")
+            .eq("customer_id", customerId)
+            .limit(1)
+            .maybeSingle();
+
+          if (existingAddr?.id) {
+            alamatId = existingAddr.id;
+          } else {
+            const { data: newAddr } = await (supabase.from("addresses") as any)
+              .insert([
+                {
+                  customer_id: customerId,
+                  nama_penerima: payload.shippingAddress.name || "Andi Pratama",
+                  no_hp: payload.shippingAddress.phone || "0812-3456-7890",
+                  alamat_lengkap: payload.shippingAddress.address || "Jl. Merdeka No. 45",
+                  kota: payload.shippingAddress.city || "Bandung",
+                  provinsi: "Jawa Barat",
+                  kode_pos: payload.shippingAddress.zip || "40111",
+                  is_primary: true,
+                },
+              ])
+              .select("id")
+              .single();
+            if (newAddr?.id) alamatId = newAddr.id;
+          }
+        } catch {
+          // ignore
+        }
+
+        // 3. Insert payment
+        const { data: payData, error: payErr } = await (supabase.from("payments") as any)
+          .insert([
+            {
+              customer_id: customerId,
+              payment_reference: newOrder.paymentRef,
+              payment_method: payload.paymentMethod || "Finnet Finpay",
+              amount: newOrder.total,
+              payment_status: "PAID",
+              paid_at: now.toISOString(),
+            },
+          ])
+          .select()
+          .single();
+
+        if (payErr) {
+          console.warn("Gagal simpan payment ke Supabase:", payErr);
+        }
+
+        if (payData) {
+          // 4. Insert order
+          const { data: ordData, error: ordErr } = await (supabase.from("orders") as any)
+            .insert([
+              {
+                order_number: newOrder.id,
+                payment_id: payData.id,
+                customer_id: customerId,
+                umkm_id: matchedUmkmMeta.id,
+                alamat_id: alamatId,
+                total_harga: newOrder.total,
+                ongkir: newOrder.shippingCost,
+                status_order: "PENDING",
+              },
+            ])
+            .select()
+            .single();
+
+          if (ordErr) {
+            console.warn("Gagal simpan order ke Supabase:", ordErr);
+          }
+
+          if (ordData) {
+            newOrder.dbId = ordData.id;
+
+            // 5. Insert order_items untuk SEMUA item yang dipesan
+            for (const item of payload.items) {
+              let varianId = item.variantId;
+              if (!varianId && item.productId) {
+                const { data: vData } = await (supabase.from("product_variants") as any)
+                  .select("id")
+                  .eq("product_id", item.productId)
+                  .limit(1)
+                  .maybeSingle();
+                varianId = vData?.id;
+              }
+
+              // Fallback varian jika tidak ketemu
+              if (!varianId) {
+                const { data: anyVar } = await (supabase.from("product_variants") as any)
+                  .select("id")
+                  .limit(1)
+                  .maybeSingle();
+                varianId = anyVar?.id;
+              }
+
+              if (varianId) {
+                await (supabase.from("order_items") as any).insert([
+                  {
+                    order_id: ordData.id,
+                    varian_id: varianId,
+                    quantity: item.qty || 1,
+                    harga: item.price || 0,
+                    subtotal: (item.price || 0) * (item.qty || 1),
+                  },
+                ]);
+              }
             }
+
+            // Sync ulang database Supabase dan kirim broadcast pembaruan
+            await this.fetchOrdersFromDatabase();
           }
         }
       } catch (e) {
