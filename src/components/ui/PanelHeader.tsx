@@ -11,6 +11,9 @@ interface PanelHeaderProps {
   onNotificationClick?: () => void;
   showSearch?: boolean; 
   actions?: ReactNode;  
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
 }
 
 export default function PanelHeader({
@@ -23,6 +26,9 @@ export default function PanelHeader({
   onNotificationClick,
   showSearch = true,
   actions,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder = "Cari...",
 }: PanelHeaderProps) {
   return (
     <header
@@ -46,7 +52,10 @@ export default function PanelHeader({
           <div className="relative">
             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#ABA9A4] w-3.5 h-3.5" />
             <input
-              placeholder="Cari..."
+              type="text"
+              value={searchValue}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+              placeholder={searchPlaceholder}
               className="border border-[#E8E6E1] bg-[#FAFAF8] rounded-[10px] pl-8 pr-4 py-2 text-[12px] outline-none focus:border-[#C9A227] w-40"
             />
           </div>

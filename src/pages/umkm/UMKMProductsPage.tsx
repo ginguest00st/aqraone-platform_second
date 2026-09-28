@@ -33,6 +33,7 @@ export default function UMKMProductsPage() {
 
   const [umkm, setUmkm] = useState<UmkmWithCategory | null>(null);
   const [products, setProducts] = useState<ProductDetail[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -91,6 +92,15 @@ export default function UMKMProductsPage() {
       setActionLoading(false);
     }
   };
+
+  // Filter produk berdasarkan nama produk atau kategori
+  const filteredProducts = products.filter((p) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const matchName = p.nama_produk?.toLowerCase().includes(q);
+    const matchCategory = p.kategori_produk?.nama_kategori?.toLowerCase().includes(q);
+    return matchName || matchCategory;
+  });
 
   const columns = [
     {
@@ -206,6 +216,9 @@ export default function UMKMProductsPage() {
           avatarBg="bg-[#FDF6E3] border-2 border-[#C9A227]"
           avatarTextColor="text-[#C9A227]"
           notifCount={0}
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Cari nama produk / kategori..."
           actions={
             <Link to="/umkm/products/add">
               <Button variant="primary" size="sm">+ Tambah Produk</Button>
@@ -240,7 +253,15 @@ export default function UMKMProductsPage() {
                 <p>Memuat produk dari Supabase...</p>
               </div>
             ) : (
-              <Table columns={columns} data={products} emptyMessage="Belum ada produk terdaftar. Klik + Tambah Produk untuk memulai katalog Anda." />
+              <Table 
+                columns={columns} 
+                data={filteredProducts} 
+                emptyMessage={
+                  searchQuery 
+                    ? `Tidak ada produk yang cocok dengan "${searchQuery}".` 
+                    : "Belum ada produk terdaftar. Klik + Tambah Produk untuk memulai katalog Anda."
+                } 
+              />
             )}
           </div>
         </main>
