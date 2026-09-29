@@ -1,59 +1,100 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import Sidebar from "../../components/ui/Sidebar";
+import { UMKM_SIDEBAR_ITEMS as sidebarItems } from "./UMKMSidebarItems";
 import StatCard from "../../components/ui/StatCard";
 import { StatusBadge } from "../../components/ui/Badge";
-import {
-  IconDashboard, IconStore, IconPackage, IconCreditCard, IconBarChart,
-  IconLogout, IconBell, IconArrowRight, IconSearch,
-} from "../../components/ui/Icons";
+import { IconBell, IconArrowRight } from "../../components/ui/Icons";
 import { useAuth } from "../../app/contexts/AuthContext";
 import { umkmService, type UmkmWithCategory } from "../../services/umkm.service";
 import { productService, type ProductDetail } from "../../services/product.service";
+import { orderService, type Order } from "../../services/order.service";
 
-const sidebarItems = [
-  { to: "/umkm/dashboard",    label: "Dashboard",        icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/umkm/store",        label: "Profil Toko",      icon: <IconStore className="w-4 h-4" /> },
-  { to: "/umkm/products",     label: "Produk",           icon: <IconPackage className="w-4 h-4" /> },
-  { to: "/umkm/products/add", label: "Tambah Produk",    icon: <IconPackage className="w-4 h-4" /> },
-  { to: "/umkm/transactions", label: "Transaksi",        icon: <IconCreditCard className="w-4 h-4" /> },
-  { to: "/umkm/history",      label: "Riwayat",          icon: <IconCreditCard className="w-4 h-4" /> },
-  { to: "/umkm/report",       label: "Laporan",          icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/login",             label: "Keluar",           icon: <IconLogout className="w-4 h-4" /> },
-];
-
-const dailySales = [
-  { day: "Sen", sales: 185000 },
-  { day: "Sel", sales: 240000 },
-  { day: "Rab", sales: 195000 },
-  { day: "Kam", sales: 310000 },
-  { day: "Jum", sales: 420000 },
-  { day: "Sab", sales: 380000 },
-  { day: "Min", sales: 150000 },
-];
-
-const monthlySales = [
-  { month: "Apr", sales: 3200000 },
-  { month: "Mei", sales: 4100000 },
-  { month: "Jun", sales: 3800000 },
-  { month: "Jul", sales: 5200000 },
-  { month: "Agu", sales: 4600000 },
-  { month: "Sep", sales: 5800000 },
-];
-
-const topProducts = [
-  { name: "Keripik Pisang", value: 45 },
-  { name: "Keripik Tempe",  value: 28 },
-  { name: "Kripik Singkong",value: 17 },
-  { name: "Lainnya",        value: 10 },
+const DEFAULT_TOP_PRODUCTS = [
+  { name: "Produk Terlaris", value: 45 },
+  { name: "Produk Lainnya", value: 28 },
+  { name: "Promo Mingguan", value: 17 },
+  { name: "Kategori Baru", value: 10 },
 ];
 
 const PALETTE = ["#C9A227", "#1A1714", "#EDD882", "#E8E6E1"];
 
-import { orderService, type Order } from "../../services/order.service";
+function formatRp(n: number) {
+  return `Rp${Number(n || 0).toLocaleString("id-ID")}`;
+}
 
-function formatRp(n: number) { return "Rp" + n.toLocaleString("id-ID"); }
+function buildDailySales(orders: Order[]) {
+  const today = new Date();
+  const points = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setHours(0, 0, 0, 0);
+    date.setDate(today.getDate() - (6 - index));
+
+    const key = date.toISOString().slice(0, 10);
+    const sales = orders
+      .filter((order) => {
+        const orderDate = order.createdAt ? new Date(order.createdAt) : null;
+        if (!orderDate || Number.isNaN(orderDate.getTime())) return false;
+        return orderDate.toISOString().slice(0, 10) === key;
+      })
+      .reduce((sum, order) => sum + Number(order.total || 0), 0);
+
+    return {
+      day: date.toLocaleDateString("id-ID", { weekday: "short" }),
+      sales,
+    };
+  });
+
+  return points;
+}
+
+function buildMonthlySales(orders: Order[]) {
+  const grouped = new Map<string, number>();
+
+  orders.forEach((order) => {
+    const orderDate = order.createdAt ? new Date(order.createdAt) : null;
+    if (!orderDate || Number.isNaN(orderDate.getTime())) return;
+
+    const key = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, "0")}`;
+    grouped.set(key, (grouped.get(key) || 0) + Number(order.total || 0));
+  });
+
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setMonth(date.getMonth() - (5 - index));
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+    return {
+      month: date.toLocaleDateString("id-ID", { month: "short" }),
+      sales: grouped.get(monthKey) || 0,
+    };
+  });
+}
+
+function buildTopProducts(orders: Order[], products: ProductDetail[]) {
+  const productMap = new Map(products.map((product) => [product.id, product.nama_produk]));
+  const totals = new Map<string, number>();
+
+  orders.forEach((order) => {
+    order.items.forEach((item) => {
+      const productName = item.name || productMap.get(item.productId) || "Produk Lainnya";
+      totals.set(productName, (totals.get(productName) || 0) + Number(item.qty || 0));
+    });
+  });
+
+  const ranked = [...totals.entries()]
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4)
+    .map(([name, qty], index) => ({
+      name,
+      value: Math.max(10, Math.round((qty / Math.max(1, [...totals.values()].reduce((sum, current) => sum + current, 0))) * 100) || 10),
+      color: PALETTE[index % PALETTE.length],
+    }));
+
+  return ranked.length ? ranked.map(({ name, value }) => ({ name, value })) : DEFAULT_TOP_PRODUCTS;
+}
 
 const tooltipStyle = {
   backgroundColor: "#1A1714",
@@ -68,18 +109,65 @@ export default function UMKMDashboardPage() {
   const { user, profile, logout } = useAuth();
   const [umkm, setUmkm] = useState<UmkmWithCategory | null>(null);
   const [products, setProducts] = useState<ProductDetail[]>([]);
-  const [recentOrders, setRecentOrders] = useState<Order[]>(() => orderService.getUmkmOrders("ALL").slice(0, 5));
+  const [allOrders, setAllOrders] = useState<Order[]>(() => orderService.getAllOrders());
   const [loading, setLoading] = useState(true);
+
+  const umkmOrders = useMemo(() => {
+    if (!umkm?.id) return [];
+
+    return allOrders.filter((order) => {
+      const sameUmkmId = order.umkmId === umkm.id;
+      const sameUmkmName = order.umkm && (order.umkm.toLowerCase() === umkm.nama_toko.toLowerCase() || order.umkm.toLowerCase() === umkm.nama_umkm.toLowerCase());
+      const itemMatches = order.items.some((item) => {
+        const itemUmkmName = item.umkm?.toLowerCase() || "";
+        return itemUmkmName === umkm.nama_toko.toLowerCase() || itemUmkmName === umkm.nama_umkm.toLowerCase();
+      });
+
+      return sameUmkmId || sameUmkmName || itemMatches;
+    });
+  }, [allOrders, umkm]);
+
+  const recentOrders = useMemo(() => umkmOrders.slice(0, 5), [umkmOrders]);
+
+  const stats = useMemo(() => {
+    const activeProductsCount = products.filter((p) => p.status === "AKTIF").length;
+    const newOrdersCount = umkmOrders.filter((order) => ["BARU", "PENDING"].includes(order.orderStatus)).length;
+    const processingCount = umkmOrders.filter((order) => ["DIPROSES", "DIKIRIM", "PROCESSING", "SHIPPED"].includes(order.orderStatus)).length;
+    const totalSoldItems = umkmOrders.reduce((sum, order) => sum + order.items.reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0), 0);
+    const totalRevenue = umkmOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+
+    return {
+      totalProducts: products.length,
+      activeProductsCount,
+      newOrdersCount,
+      processingCount,
+      totalSoldItems,
+      totalRevenue,
+    };
+  }, [products, umkmOrders]);
+
+  const dailySales = useMemo(() => buildDailySales(umkmOrders), [umkmOrders]);
+  const monthlySales = useMemo(() => buildMonthlySales(umkmOrders), [umkmOrders]);
+  const topProducts = useMemo(() => buildTopProducts(umkmOrders, products), [umkmOrders, products]);
 
   useEffect(() => {
     async function loadUMKM() {
-      if (!user) return;
+      if (!user) {
+        setUmkm(null);
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data: uData } = await umkmService.getUmkmByUserId(user.id);
         if (uData) {
           setUmkm(uData);
           const { data: pData } = await productService.getProductsByUmkm(uData.id);
           if (pData) setProducts(pData);
+        } else {
+          setUmkm(null);
+          setProducts([]);
         }
       } catch (err) {
         console.error("Dashboard error:", err);
@@ -87,21 +175,19 @@ export default function UMKMDashboardPage() {
         setLoading(false);
       }
     }
+
     loadUMKM();
 
-    // Muat pesanan dari database
     orderService.fetchOrdersFromDatabase().then((orders) => {
-      setRecentOrders(orders.slice(0, 5));
+      setAllOrders(orders);
     });
 
     const unsubscribe = orderService.subscribe((orders) => {
-      setRecentOrders(orders.slice(0, 5));
+      setAllOrders(orders);
     });
 
     return () => unsubscribe();
   }, [user]);
-
-  const activeProductsCount = products.filter(p => p.status === "AKTIF").length;
 
   return (
     <div className="flex h-screen bg-[#FAFAF8] overflow-hidden" data-figma-layer="UMKMDashboard">
@@ -208,12 +294,12 @@ export default function UMKMDashboardPage() {
 
           {/* Stat Cards */}
           <div data-figma-layer="StatGrid" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-            <StatCard label="Total Produk"   value={loading ? "..." : String(products.length)} icon="📦" accent />
-            <StatCard label="Produk Aktif"   value={loading ? "..." : String(activeProductsCount)} icon="✅" iconBg="bg-emerald-50" />
-            <StatCard label="Pesanan Baru"   value="0"       icon="🛎️" iconBg="bg-sky-50" />
-            <StatCard label="Diproses"       value="0"       icon="⚙️" iconBg="bg-orange-50" />
-            <StatCard label="Produk Terjual" value="0"       icon="🏆" />
-            <StatCard label="Total Penjualan"value="Rp0"      icon="💰" />
+            <StatCard label="Total Produk" value={loading ? "..." : String(stats.totalProducts)} icon="📦" accent />
+            <StatCard label="Produk Aktif" value={loading ? "..." : String(stats.activeProductsCount)} icon="✅" iconBg="bg-emerald-50" />
+            <StatCard label="Pesanan Baru" value={loading ? "..." : String(stats.newOrdersCount)} icon="🛎️" iconBg="bg-sky-50" />
+            <StatCard label="Diproses" value={loading ? "..." : String(stats.processingCount)} icon="⚙️" iconBg="bg-orange-50" />
+            <StatCard label="Produk Terjual" value={loading ? "..." : String(stats.totalSoldItems)} icon="🏆" />
+            <StatCard label="Total Penjualan" value={loading ? "..." : formatRp(stats.totalRevenue)} icon="💰" />
           </div>
 
           {/* Charts row 1 */}
@@ -260,8 +346,8 @@ export default function UMKMDashboardPage() {
               </ResponsiveContainer>
               <div className="space-y-2 mt-2">
                 {topProducts.map((p, i) => (
-                  <div key={p.name} className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PALETTE[i] }} />
+                  <div key={`${p.name}-${i}`} className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PALETTE[i % PALETTE.length] }} />
                     <span className="text-[11px] text-[#7C7770] flex-1 truncate">{p.name}</span>
                     <span className="text-[11px] font-bold text-[#1A1714]">{p.value}%</span>
                   </div>
@@ -301,25 +387,31 @@ export default function UMKMDashboardPage() {
               </Link>
             </div>
             <div className="space-y-2">
-              {recentOrders.map(order => (
-                <Link key={order.id} to={`/umkm/transactions/${order.id}`}>
-                  <div data-figma-layer="OrderRow"
-                    className="flex items-center gap-4 p-4 bg-[#FAFAF8] border border-[#E8E6E1] rounded-[14px] hover:border-[#C9A227] hover:bg-[#FDF6E3] transition-all cursor-pointer mb-2"
-                  >
-                    <div className="w-10 h-10 bg-[#1A1714] rounded-[12px] flex items-center justify-center text-white font-bold text-[11px] shrink-0 font-mono">
-                      {order.id.slice(-3)}
+              {recentOrders.length === 0 ? (
+                <div className="rounded-[14px] border border-dashed border-[#E8E6E1] bg-[#FAFAF8] p-6 text-center text-[12px] text-[#7C7770]">
+                  Belum ada pesanan masuk untuk toko ini.
+                </div>
+              ) : (
+                recentOrders.map(order => (
+                  <Link key={order.id} to={`/umkm/transactions/${order.id}`}>
+                    <div data-figma-layer="OrderRow"
+                      className="flex items-center gap-4 p-4 bg-[#FAFAF8] border border-[#E8E6E1] rounded-[14px] hover:border-[#C9A227] hover:bg-[#FDF6E3] transition-all cursor-pointer mb-2"
+                    >
+                      <div className="w-10 h-10 bg-[#1A1714] rounded-[12px] flex items-center justify-center text-white font-bold text-[11px] shrink-0 font-mono">
+                        {order.id.slice(-3)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-[#1A1714]">{order.customer}</p>
+                        <p className="text-[11px] text-[#ABA9A4] truncate">{order.items[0]?.name || "Produk UMKM"}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[13px] font-bold text-[#1A1714]">{formatRp(order.total)}</p>
+                        <StatusBadge status={order.orderStatus} type="order" />
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-[#1A1714]">{order.customer}</p>
-                      <p className="text-[11px] text-[#ABA9A4] truncate">{order.items[0]?.name || "Produk UMKM"}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-[13px] font-bold text-[#1A1714]">{formatRp(order.total)}</p>
-                      <StatusBadge status={order.orderStatus} type="order" />
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                ))
+              )}
             </div>
           </div>
 

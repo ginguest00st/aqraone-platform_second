@@ -1,27 +1,16 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import Sidebar from "../../components/ui/Sidebar";
+import { UMKM_SIDEBAR_ITEMS as sidebarItems } from "./UMKMSidebarItems";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
 import PanelHeader from "../../components/ui/PanelHeader";
 import { StatusBadge } from "../../components/ui/Badge";
 import { ConfirmModal } from "../../components/ui/Modal";
-import { IconDashboard, IconStore, IconPackage, IconBarChart, IconLogout, IconPlus } from "../../components/ui/Icons";
 import { useAuth } from "../../app/contexts/AuthContext";
 import { umkmService, type UmkmWithCategory } from "../../services/umkm.service";
 import { productService, type ProductDetail } from "../../services/product.service";
 import { sanitizeProductImageUrl, getProductFallbackImage } from "../../lib/imageUtils";
-
-const sidebarItems = [
-  { to: "/umkm/dashboard", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/umkm/store", label: "Profil Toko", icon: <IconStore className="w-4 h-4" /> },
-  { to: "/umkm/products", label: "Produk", icon: <IconPackage className="w-4 h-4" /> },
-  { to: "/umkm/products/add", label: "Tambah Produk", icon: <IconPlus className="w-4 h-4" /> },
-  { to: "/umkm/transactions", label: "Transaksi", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/umkm/history", label: "Riwayat", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/umkm/report", label: "Laporan", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/login", label: "Keluar", icon: <IconLogout className="w-4 h-4" /> },
-];
 
 function formatRp(n: number) {
   return "Rp" + n.toLocaleString("id-ID");
@@ -57,7 +46,7 @@ export default function UMKMProductsPage() {
       setUmkm(umkmData);
 
       // 2. Dapatkan daftar produk milik UMKM ini
-      const { data: prodData, error: prodErr } = await productService.getProductsByUmkm(umkmData.id);
+      const { data: prodData, error: prodErr } = await productService.getAllProducts();
       if (prodErr) {
         setErrorMsg("Gagal memuat produk: " + prodErr.message);
       } else {

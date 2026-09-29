@@ -1,24 +1,15 @@
 import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import Sidebar from "../../components/ui/Sidebar";
+import { UMKM_SIDEBAR_ITEMS as sidebarItems } from "./UMKMSidebarItems";
 import { Input, Select } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
-import { IconDashboard, IconStore, IconPackage, IconBarChart, IconLogout } from "../../components/ui/Icons";
 import { useAuth } from "../../app/contexts/AuthContext";
 import { umkmService, type UmkmWithCategory } from "../../services/umkm.service";
 import { categoryService } from "../../services/category.service";
 import { productService, type VariantInput } from "../../services/product.service";
 import type { KategoriProduk, ProductStatus } from "../../types/database.types";
 import { compressImageFile } from "../../lib/imageUtils";
-
-const sidebarItems = [
-  { to: "/umkm/dashboard", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/umkm/store", label: "Profil Toko", icon: <IconStore className="w-4 h-4" /> },
-  { to: "/umkm/products", label: "Produk", icon: <IconPackage className="w-4 h-4" /> },
-  { to: "/umkm/transactions", label: "Transaksi", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/umkm/report", label: "Laporan", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/login", label: "Keluar", icon: <IconLogout className="w-4 h-4" /> },
-];
 
 interface VariantForm {
   name: string;
