@@ -3,6 +3,7 @@ import { useState } from "react";
 import { IconSearch, IconCart, IconBell, IconUser, IconMenu, IconLogout, IconHome, IconPackage } from "./Icons";
 import { useAuth } from "../../app/contexts/AuthContext";
 import { useCart } from "../../app/contexts/CartContext";
+import LogoutConfirmModal from "./LogoutConfirmModal";
 
 interface NavbarProps {
   cartCount?: number;
@@ -13,13 +14,27 @@ interface NavbarProps {
 export default function Navbar({ cartCount: propCartCount, notifCount = 0, user: propUser }: NavbarProps) {
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const navigate = useNavigate();
   const { user: authUser, logout } = useAuth();
-  const { cartCount: liveCartCount } = useCart();
+  const { cartCount: liveCartCount, clearCart } = useCart();
   const user = authUser || propUser;
 
-  // Use live cart count from CartContext
-  const cartCount = liveCartCount;
+  // Tampilkan jumlah keranjang dari CartContext jika user sedang login
+  const cartCount = authUser ? liveCartCount : 0;
+
+  const handleConfirmLogout = async () => {
+    try {
+      setLogoutLoading(true);
+      clearCart();
+      navigate("/", { replace: true });
+      await logout();
+    } finally {
+      setLogoutLoading(false);
+      setShowLogoutModal(false);
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +127,13 @@ export default function Navbar({ cartCount: propCartCount, notifCount = 0, user:
                     <IconPackage className="w-4 h-4 text-[#7C7770]" /> Pesanan Saya
                   </Link>
                   <div className="my-1 border-t border-[#E8E6E1]" />
-                  <button className="flex items-center gap-3 w-full px-4 py-2.5 text-[13px] text-[#C0392B] hover:bg-[#FAFAF8]" onClick={() => { setMenuOpen(false); logout(); navigate("/login"); }}>
+                  <button
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-[13px] text-[#C0392B] hover:bg-[#FAFAF8] transition-colors cursor-pointer"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setShowLogoutModal(true);
+                    }}
+                  >
                     <IconLogout className="w-4 h-4" /> Keluar
                   </button>
                 </div>
@@ -129,6 +150,14 @@ export default function Navbar({ cartCount: propCartCount, notifCount = 0, user:
           </button>
         </div>
       </div>
+
+      {/* Pop-up Dialog Konfirmasi Logout */}
+      <LogoutConfirmModal
+        open={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        loading={logoutLoading}
+      />
     </header>
   );
 }

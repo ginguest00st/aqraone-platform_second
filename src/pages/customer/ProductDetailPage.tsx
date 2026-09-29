@@ -94,7 +94,7 @@ export default function ProductDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8F8F6]">
-        <Navbar user={{ name: "Andi", role: "customer" }} />
+        <Navbar />
         <div className="max-w-4xl mx-auto px-4 py-24 text-center">
           <div className="w-10 h-10 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-sm font-semibold text-[#202020]">Memuat informasi produk...</p>
@@ -105,7 +105,7 @@ export default function ProductDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar user={{ name: "Andi", role: "customer" }} />
+      <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Breadcrumb */}

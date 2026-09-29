@@ -251,6 +251,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setProfile(null);
+      try {
+        localStorage.removeItem("aqraone_user_cart");
+        localStorage.removeItem("aqraone_direct_checkout");
+        sessionStorage.clear();
+      } catch {
+        // ignore
+      }
     }
   };
 

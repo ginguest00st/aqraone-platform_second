@@ -50,7 +50,7 @@ export default function OrderDetailPage() {
   if (!order) {
     return (
       <div className="min-h-screen bg-[#F8F8F6]">
-        <Navbar user={{ name: "Andi", role: "customer" }} />
+        <Navbar />
         <div className="max-w-4xl mx-auto px-4 py-16 text-center">
           <p className="text-4xl mb-3">🔍</p>
           <h1 className="text-xl font-bold text-[#202020]">Pesanan Tidak Ditemukan</h1>
@@ -67,7 +67,7 @@ export default function OrderDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar user={{ name: "Andi", role: "customer" }} />
+      <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         <div className="flex items-center gap-2 text-sm text-[#6B6B6B] mb-4">

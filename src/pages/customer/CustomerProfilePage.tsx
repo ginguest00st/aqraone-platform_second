@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import Navbar from "../../components/ui/Navbar";
+import LogoutConfirmModal from "../../components/ui/LogoutConfirmModal";
 import { Input } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import { StatusBadge } from "../../components/ui/Badge";
@@ -10,8 +11,11 @@ import { orderService, type Order } from "../../services/order.service";
 import { supabase } from "../../lib/supabase";
 
 export default function CustomerProfilePage() {
-  const { user, refreshProfile } = useAuth();
-  const { cartCount } = useCart();
+  const { user, refreshProfile, logout } = useAuth();
+  const { cartCount, clearCart } = useCart();
+  const navigate = useNavigate();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [edit, setEdit] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -21,6 +25,18 @@ export default function CustomerProfilePage() {
     address: "Jl. Merdeka No. 45, Bandung",
   });
   const [orders, setOrders] = useState<Order[]>(() => orderService.getCustomerOrders(user?.email));
+
+  const handleConfirmLogout = async () => {
+    try {
+      setLogoutLoading(true);
+      clearCart();
+      navigate("/", { replace: true });
+      await logout();
+    } finally {
+      setLogoutLoading(false);
+      setShowLogoutModal(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -99,7 +115,7 @@ export default function CustomerProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar cartCount={cartCount} user={{ name: form.name.split(" ")[0] || "Andi", role: "customer" }} />
+      <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         <div className="grid md:grid-cols-4 gap-5">
@@ -141,6 +157,16 @@ export default function CustomerProfilePage() {
                     )}
                   </Link>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutModal(true)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all text-red-500 hover:bg-red-50 font-medium cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <span>🚪</span>
+                    <span>Keluar</span>
+                  </div>
+                </button>
               </nav>
             </div>
           </div>
@@ -224,6 +250,13 @@ export default function CustomerProfilePage() {
           </div>
         </div>
       </div>
+      {/* Pop-up Dialog Konfirmasi Logout */}
+      <LogoutConfirmModal
+        open={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        loading={logoutLoading}
+      />
     </div>
   );
 }

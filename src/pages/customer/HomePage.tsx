@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import Navbar from "../../components/ui/Navbar";
 import ProductCard from "../../components/ui/ProductCard";
+import WelcomePromoModal from "../../components/ui/WelcomePromoModal";
 import {
   IconSearch, IconArrowRight, IconHome, IconFolder,
   IconCart, IconPackage, IconUser, IconStar,
@@ -46,12 +47,28 @@ function SectionLabel({ children }: { children: string }) {
 }
 
 export default function HomePage() {
-  const [cart, setCart] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("Terlaris");
   const [dbProducts, setDbProducts] = useState<ProductWithUmkm[]>([]);
   const [dbUmkm, setDbUmkm] = useState<UmkmWithCategory[]>([]);
+  const [showPromoModal, setShowPromoModal] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Tampilkan pop-up promo selamat datang setelah delay 800ms jika belum pernah ditutup sesi ini
+    const seen = sessionStorage.getItem("aqraone_promo_dismissed");
+    if (!seen) {
+      const timer = setTimeout(() => {
+        setShowPromoModal(true);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleClosePromo = () => {
+    setShowPromoModal(false);
+    sessionStorage.setItem("aqraone_promo_dismissed", "true");
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -109,8 +126,6 @@ export default function HomePage() {
       })
     : defaultUmkmSpotlight;
 
-  const addToCart = (id: string) => setCart(prev => [...prev, id]);
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (search.trim()) navigate(`/products?q=${encodeURIComponent(search)}`);
@@ -118,7 +133,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#F5F4F0] pb-16 md:pb-0 w-full">
-      <Navbar cartCount={cart.length} />
+      <Navbar />
 
       {/* ── HERO ─────────────────────────────────────────── */}
       <section className="relative w-full" style={{ height: 520 }}>
@@ -283,7 +298,7 @@ export default function HomePage() {
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {displayedProducts.map(p => (
-            <ProductCard key={p.id} product={p} onAddToCart={addToCart} />
+            <ProductCard key={p.id} product={p} />
           ))}
         </div>
 
@@ -509,6 +524,33 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* Floating Button Buka Promo */}
+      <button
+        type="button"
+        onClick={() => setShowPromoModal(true)}
+        className="fixed bottom-20 md:bottom-8 right-4 md:right-8 z-30 flex items-center gap-2.5 px-4 py-2.5 bg-gradient-to-r from-[#1A1714] to-[#2E2720] text-[#EDD882] rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.3)] border border-[#C9A227]/40 hover:scale-105 active:scale-95 transition-all cursor-pointer group"
+        title="Lihat Promo Spesial UMKM"
+      >
+        <span className="text-base group-hover:rotate-12 transition-transform">🎁</span>
+        <span className="text-xs font-bold text-white tracking-wide">
+          Voucher <span className="text-[#EDD882]">Diskon 30%</span>
+        </span>
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#EDD882] opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#C9A227]"></span>
+        </span>
+      </button>
+
+      {/* Pop-up Sambutan & Promo Spesial */}
+      <WelcomePromoModal
+        open={showPromoModal}
+        onClose={handleClosePromo}
+        onClaim={() => {
+          handleClosePromo();
+          navigate("/products");
+        }}
+      />
     </div>
   );
 }

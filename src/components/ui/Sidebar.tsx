@@ -1,5 +1,8 @@
-import { NavLink } from "react-router";
-import React from "react";
+import { NavLink, useNavigate } from "react-router";
+import React, { useState } from "react";
+import { useAuth } from "../../app/contexts/AuthContext";
+import { useCart } from "../../app/contexts/CartContext";
+import LogoutConfirmModal from "./LogoutConfirmModal";
 
 export interface NavItem {
   to: string;
@@ -17,6 +20,23 @@ export interface SidebarProps {
 }
 
 export default function Sidebar({ items, logo, footer, collapsed = false, onItemClick }: SidebarProps) {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const { clearCart } = useCart();
+
+  const handleConfirmLogout = async () => {
+    try {
+      setLogoutLoading(true);
+      clearCart();
+      navigate("/", { replace: true });
+      await logout();
+    } finally {
+      setLogoutLoading(false);
+      setShowLogoutModal(false);
+    }
+  };
   return (
     <aside
       data-figma-layer="Sidebar"
@@ -40,35 +60,61 @@ export default function Sidebar({ items, logo, footer, collapsed = false, onItem
       )}
 
       <nav className="flex-1 py-3 overflow-y-auto space-y-0.5 px-2 relative z-10">
-        {items.map((item) => (
-          <NavLink
-            key={item.label}
-            to={item.to}
-            onClick={() => {
-              item.onClick?.();
-              onItemClick?.(item);
-            }}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13px] font-medium transition-all duration-150 ${
-                isActive
-                  ? "bg-white/20 text-white shadow-[0_2px_12px_rgba(0,0,0,0.2)] backdrop-blur-sm border border-white/20"
-                  : "text-white/55 hover:bg-white/10 hover:text-white/90"
-              } ${collapsed ? "justify-center" : ""}`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span className={`shrink-0 w-5 h-5 flex items-center justify-center ${isActive ? "text-[#EDD882]" : ""}`}>{item.icon}</span>
-                {!collapsed && (
-                  <span className="truncate">{item.label}</span>
-                )}
-                {!collapsed && isActive && (
-                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#C9A227] shrink-0" />
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
+        {items.map((item) => {
+          const isLogout = item.label === "Keluar" || item.to === "/login";
+          if (isLogout) {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  item.onClick?.();
+                  onItemClick?.(item);
+                  setShowLogoutModal(true);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13px] font-medium transition-all duration-150 text-red-400/80 hover:bg-red-500/15 hover:text-red-300 cursor-pointer ${
+                  collapsed ? "justify-center" : ""
+                }`}
+              >
+                <span className="shrink-0 w-5 h-5 flex items-center justify-center">
+                  {item.icon}
+                </span>
+                {!collapsed && <span className="truncate">{item.label}</span>}
+              </button>
+            );
+          }
+
+          return (
+            <NavLink
+              key={item.label}
+              to={item.to}
+              end={item.to === "/"}
+              onClick={() => {
+                item.onClick?.();
+                onItemClick?.(item);
+              }}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13px] font-medium transition-all duration-150 ${
+                  isActive
+                    ? "bg-white/20 text-white shadow-[0_2px_12px_rgba(0,0,0,0.2)] backdrop-blur-sm border border-white/20"
+                    : "text-white/55 hover:bg-white/10 hover:text-white/90"
+                } ${collapsed ? "justify-center" : ""}`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span className={`shrink-0 w-5 h-5 flex items-center justify-center ${isActive ? "text-[#EDD882]" : ""}`}>{item.icon}</span>
+                  {!collapsed && (
+                    <span className="truncate">{item.label}</span>
+                  )}
+                  {!collapsed && isActive && (
+                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#C9A227] shrink-0" />
+                  )}
+                </>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {footer && (
@@ -76,6 +122,14 @@ export default function Sidebar({ items, logo, footer, collapsed = false, onItem
           {footer}
         </div>
       )}
+
+      {/* Pop-up Dialog Konfirmasi Logout */}
+      <LogoutConfirmModal
+        open={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        loading={logoutLoading}
+      />
     </aside>
   );
 }

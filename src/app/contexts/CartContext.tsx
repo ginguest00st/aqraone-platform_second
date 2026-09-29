@@ -78,19 +78,7 @@ export function syncItemImage(item: CartItem): CartItem {
   return item;
 }
 
-const DEFAULT_ITEMS: CartItem[] = [
-  {
-    id: "init-1",
-    productId: "66982947-c766-4473-9249-68de9cde96a5",
-    name: "Kain Batik Tulis Sutra Motif Truntum",
-    umkm: "Batik Danar Solo",
-    variant: "Kain Panjang 2.4 x 1.15 Meter",
-    price: 350000,
-    qty: 1,
-    image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop&q=80",
-    checked: true,
-  },
-];
+const DEFAULT_ITEMS: CartItem[] = [];
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(() => {
@@ -98,8 +86,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(syncItemImage);
+        if (Array.isArray(parsed)) {
+          const cleanItems = parsed
+            .filter((item: CartItem) => item && item.id !== "init-1" && item.name !== "Kain Batik Tulis Sutra Motif Truntum")
+            .map(syncItemImage);
+          if (cleanItems.length !== parsed.length) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanItems));
+          }
+          return cleanItems;
         }
       }
     } catch (e) {

@@ -37,7 +37,9 @@ export default function PaymentPage() {
   const subtotal = orderData?.subtotal || checkoutItems.reduce((acc: number, i: any) => acc + i.price * i.qty, 0);
   const ongkir = orderData?.ongkir !== undefined ? orderData.ongkir : 15000;
   const platformFee = 1000;
-  const totalAmount = (orderData?.total !== undefined ? orderData.total : subtotal + ongkir) + (orderData?.total ? 0 : platformFee);
+  const discount = Number(orderData?.discount) || 0;
+  const voucherCode = orderData?.voucherCode || null;
+  const totalAmount = orderData?.total !== undefined ? orderData.total : Math.max(0, subtotal + ongkir + platformFee - discount);
 
   const handlePay = () => {
     setLoading(true);
@@ -76,7 +78,7 @@ export default function PaymentPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar user={{ name: "Andi", role: "customer" }} />
+      <Navbar />
 
       <div className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center gap-2 text-xs text-[#6B6B6B] mb-4">
@@ -162,6 +164,12 @@ export default function PaymentPage() {
               <span>Biaya Layanan Platform</span>
               <span className="font-medium text-[#202020]">Rp1.000</span>
             </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-emerald-600 font-semibold bg-emerald-50 px-2 py-1 rounded">
+                <span>Diskon Voucher ({voucherCode || "Promo"})</span>
+                <span>−{formatRp(discount)}</span>
+              </div>
+            )}
           </div>
         </div>
 

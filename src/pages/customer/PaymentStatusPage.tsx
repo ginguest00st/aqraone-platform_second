@@ -55,7 +55,7 @@ export default function PaymentStatusPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar user={{ name: "Andi", role: "customer" }} />
+      <Navbar />
 
       {/* Status Toggle (demo) */}
       <div className="bg-white border-b border-[#E5E5E5] px-4 py-2 flex gap-2 justify-center">

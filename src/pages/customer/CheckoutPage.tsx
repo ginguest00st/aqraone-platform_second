@@ -5,6 +5,8 @@ import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { formatRp } from "../../components/ui/ProductCard";
 import { useCart } from "../../app/contexts/CartContext";
+import VoucherSection from "../../components/ui/VoucherSection";
+import type { VoucherApplyResult } from "../../lib/voucher";
 
 const shippingOptions = [
   { id: "regular", label: "JNE Regular", desc: "Estimasi 2–3 hari kerja", price: 15000 },
@@ -23,12 +25,15 @@ export default function CheckoutPage() {
     city: "Jakarta Selatan",
     zip: "12730",
   });
+  const [appliedVoucher, setAppliedVoucher] = useState<VoucherApplyResult | null>(null);
   const navigate = useNavigate();
 
   const selectedShipping = shippingOptions.find((s) => s.id === shipping) || shippingOptions[0];
   const ongkir = checkoutItems.length > 0 ? selectedShipping.price : 0;
   const subtotal = checkoutItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const total = subtotal + ongkir;
+  const platformFee = 1000;
+  const discount = appliedVoucher ? appliedVoucher.discount : 0;
+  const total = Math.max(0, subtotal + ongkir + platformFee - discount);
 
   const update = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -38,6 +43,9 @@ export default function CheckoutPage() {
       items: checkoutItems,
       subtotal,
       ongkir,
+      platformFee,
+      discount,
+      voucherCode: appliedVoucher?.code || null,
       total,
       shippingOption: selectedShipping,
       shippingAddress: form,
@@ -53,7 +61,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar user={{ name: "Andi", role: "customer" }} />
+      <Navbar />
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         <div className="flex items-center gap-2 text-xs text-[#6B6B6B] mb-4">
@@ -162,6 +170,14 @@ export default function CheckoutPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Voucher & Promo */}
+              <VoucherSection
+                subtotal={subtotal}
+                shippingCost={ongkir}
+                currentVoucher={appliedVoucher}
+                onVoucherApplied={setAppliedVoucher}
+              />
             </div>
 
             {/* Summary Panel */}
@@ -181,10 +197,18 @@ export default function CheckoutPage() {
                     <span>Biaya Layanan Finnet Platform</span>
                     <span className="font-semibold text-[#202020]">Rp1.000</span>
                   </div>
+
+                  {discount > 0 && (
+                    <div className="flex justify-between text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                      <span>Diskon Voucher ({appliedVoucher?.code})</span>
+                      <span>−{formatRp(discount)}</span>
+                    </div>
+                  )}
+
                   <div className="border-t border-[#E5E5E5] pt-3 flex justify-between font-bold text-[#202020] text-base">
                     <span>Total Tagihan</span>
                     <span className="text-lg text-[#C9A227] font-display">
-                      {formatRp(total + 1000)}
+                      {formatRp(total)}
                     </span>
                   </div>
                 </div>

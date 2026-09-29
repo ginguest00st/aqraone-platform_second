@@ -21,7 +21,7 @@ export default function UMKMStorePage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar user={{ name: "Andi", role: "customer" }} />
+      <Navbar />
 
       {/* Store Header */}
       <div className="bg-white border-b border-[#E5E5E5]">

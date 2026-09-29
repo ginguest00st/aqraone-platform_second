@@ -3,6 +3,9 @@ import Navbar from "../../components/ui/Navbar";
 import Button from "../../components/ui/Button";
 import { formatRp } from "../../components/ui/ProductCard";
 import { useCart } from "../../app/contexts/CartContext";
+import VoucherSection from "../../components/ui/VoucherSection";
+import type { VoucherApplyResult } from "../../lib/voucher";
+import { useState } from "react";
 
 export default function CartPage() {
   const {
@@ -14,12 +17,13 @@ export default function CartPage() {
     setDirectCheckoutItem,
   } = useCart();
   const navigate = useNavigate();
+  const [appliedVoucher, setAppliedVoucher] = useState<VoucherApplyResult | null>(null);
 
   const checked = items.filter((i) => i.checked);
   const subtotal = checked.reduce((s, i) => s + i.price * i.qty, 0);
   const ongkir = checked.length > 0 ? 15000 : 0;
-  const diskon = 0;
-  const total = subtotal + ongkir - diskon;
+  const diskon = appliedVoucher ? appliedVoucher.discount : 0;
+  const total = Math.max(0, subtotal + ongkir - diskon);
 
   const handleProceedCheckout = () => {
     setDirectCheckoutItem(null);
@@ -33,7 +37,7 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F6]">
-      <Navbar user={{ name: "Andi", role: "customer" }} />
+      <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
@@ -145,7 +149,14 @@ export default function CartPage() {
             </div>
 
             {/* Summary */}
-            <div className="md:col-span-1">
+            <div className="md:col-span-1 space-y-4">
+              <VoucherSection
+                subtotal={subtotal}
+                shippingCost={ongkir}
+                currentVoucher={appliedVoucher}
+                onVoucherApplied={setAppliedVoucher}
+              />
+
               <div className="bg-white rounded-2xl border border-[#E5E5E5] p-5 sticky top-24 shadow-xs">
                 <h2 className="font-semibold text-[#202020] mb-4 flex items-center justify-between">
                   <span>Ringkasan Belanja</span>
@@ -162,10 +173,12 @@ export default function CartPage() {
                     <span>Ongkos Kirim</span>
                     <span className="font-semibold text-[#202020]">{formatRp(ongkir)}</span>
                   </div>
-                  <div className="flex justify-between text-[#2E8B57]">
-                    <span>Diskon</span>
-                    <span className="font-semibold">−{formatRp(diskon)}</span>
-                  </div>
+                  {diskon > 0 && (
+                    <div className="flex justify-between text-[#2E8B57] bg-emerald-50 px-2 py-1 rounded">
+                      <span>Diskon ({appliedVoucher?.code})</span>
+                      <span className="font-semibold">−{formatRp(diskon)}</span>
+                    </div>
+                  )}
                   <div className="border-t border-[#E5E5E5] pt-3 flex justify-between font-bold text-[#202020] text-base">
                     <span>Total Pembayaran</span>
                     <span className="text-lg text-[#C9A227] font-display">{formatRp(total)}</span>
