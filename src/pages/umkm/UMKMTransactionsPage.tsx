@@ -1,21 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import Sidebar from "../../components/ui/Sidebar";
+import { UMKM_SIDEBAR_ITEMS as sidebarItems } from "./UMKMSidebarItems";
 import { StatusBadge } from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import PanelHeader from "../../components/ui/PanelHeader";
-import { IconDashboard, IconStore, IconPackage, IconBarChart, IconLogout } from "../../components/ui/Icons";
 import { orderService, Order, OrdStatus } from "../../services/order.service";
-
-const sidebarItems = [
-  { to: "/umkm/dashboard", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/umkm/store", label: "Profil Toko", icon: <IconStore className="w-4 h-4" /> },
-  { to: "/umkm/products", label: "Produk", icon: <IconPackage className="w-4 h-4" /> },
-  { to: "/umkm/transactions", label: "Transaksi", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/umkm/history", label: "Riwayat", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/umkm/report", label: "Laporan", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/login", label: "Keluar", icon: <IconLogout className="w-4 h-4" /> },
-];
 
 const umkmLogo = (
   <div className="flex items-center gap-2.5">

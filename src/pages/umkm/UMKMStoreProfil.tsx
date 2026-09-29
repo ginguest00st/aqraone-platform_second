@@ -1,23 +1,13 @@
 import { useState, useEffect } from "react";
 import Sidebar from "../../components/ui/Sidebar";
+import { UMKM_SIDEBAR_ITEMS as sidebarItems } from "./UMKMSidebarItems";
 import { Input, Select } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import PanelHeader from "../../components/ui/PanelHeader";
-import { IconDashboard, IconStore, IconPackage, IconBarChart, IconLogout } from "../../components/ui/Icons";
 import { useAuth } from "../../app/contexts/AuthContext";
 import { umkmService, type UmkmWithCategory } from "../../services/umkm.service";
 import { categoryService } from "../../services/category.service";
 import type { KategoriUmkm } from "../../types/database.types";
-
-const sidebarItems = [
-  { to: "/umkm/dashboard", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/umkm/store", label: "Profil Toko", icon: <IconStore className="w-4 h-4" /> },
-  { to: "/umkm/products", label: "Produk", icon: <IconPackage className="w-4 h-4" /> },
-  { to: "/umkm/transactions", label: "Transaksi", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/umkm/history", label: "Riwayat", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/umkm/report", label: "Laporan", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/login", label: "Keluar", icon: <IconLogout className="w-4 h-4" /> },
-];
 
 export default function UMKMStoreProfil() {
   const { user, profile, logout } = useAuth();

@@ -1,23 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import Sidebar from "../../components/ui/Sidebar";
+import { UMKM_SIDEBAR_ITEMS as sidebarItems } from "./UMKMSidebarItems";
 import Tabs from "../../components/ui/Tabs";
 import Table from "../../components/ui/Table";
 import { StatusBadge } from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import PanelHeader from "../../components/ui/PanelHeader";
 import { Input } from "../../components/ui/Input";
-import { IconDashboard, IconPackage, IconBarChart, IconLogout } from "../../components/ui/Icons";
 import { orderService, Order } from "../../services/order.service";
-
-const sidebarItems = [
-  { to: "/umkm/dashboard", label: "Dashboard", icon: <IconDashboard className="w-4 h-4" /> },
-  { to: "/umkm/products", label: "Produk", icon: <IconPackage className="w-4 h-4" /> },
-  { to: "/umkm/transactions", label: "Transaksi", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/umkm/history", label: "Riwayat", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/umkm/report", label: "Laporan", icon: <IconBarChart className="w-4 h-4" /> },
-  { to: "/login", label: "Keluar", icon: <IconLogout className="w-4 h-4" /> },
-];
 
 function formatRp(n: number) { return "Rp" + n.toLocaleString("id-ID"); }
 
